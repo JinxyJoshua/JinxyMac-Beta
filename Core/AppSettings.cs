@@ -72,6 +72,9 @@ public sealed class AppSettings
     /// <summary>Show the menu bar item. On Windows this is the notification area.</summary>
     public bool MenuBar { get; set; } = true;
 
+    /// <summary>Look for a newer build when the app opens.</summary>
+    public bool AutoCheckUpdates { get; set; } = true;
+
     public double? WindowWidth { get; set; }
     public double? WindowHeight { get; set; }
 

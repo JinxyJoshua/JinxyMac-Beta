@@ -115,12 +115,16 @@ public partial class MainWindow : Window
         WireSettings();
         WireCache();
         WireMenuBar();
+        WireUpdates();
         DescribeEngine();
         ApplySettings();
 
         // After ApplySettings, which is what decides the screen to select.
         _ = StartCapture();
         RefreshMenuBar();
+
+        // Quietly, and only if asked for. Nothing is downloaded without a press.
+        if (_settings.AutoCheckUpdates) _ = CheckForUpdate(announce: false);
 
         _stats = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _stats.Tick += (_, _) => UpdateMeasured();
@@ -842,6 +846,7 @@ public partial class MainWindow : Window
 
         HotkeysEnabled.IsChecked = _settings.HotkeysOn;
         MenuBarEnabled.IsChecked = _settings.MenuBar;
+        AutoCheckUpdates.IsChecked = _settings.AutoCheckUpdates;
 
         HotkeyButton.Content = _settings.HotkeyName;
         ComboHotkeyButton.Content = _settings.ComboName;
@@ -2046,6 +2051,90 @@ public partial class MainWindow : Window
         _settings.Save();
     }
 
+    // ---- updates ----
+
+    private Available? _update;
+
+    private void WireUpdates()
+    {
+        CheckUpdateButton.Click += async (_, _) => await CheckForUpdate(announce: true);
+        InstallUpdateButton.Click += async (_, _) => await InstallUpdate();
+
+        ViewUpdateButton.Click += (_, _) =>
+            Open("https://github.com/JinxyJoshua/JinxyMac-Beta/releases/latest");
+
+        AutoCheckUpdates.IsCheckedChanged += (_, _) =>
+        {
+            if (_loading) return;
+
+            _settings.AutoCheckUpdates = AutoCheckUpdates.IsChecked == true;
+            _settings.Save();
+        };
+
+        UpdateStatusText.Text = $"Running {Updater.Version}.";
+    }
+
+    /// <summary>
+    /// Asks whether there is a newer build.
+    /// </summary>
+    /// <param name="announce">
+    /// Whether to say so when there is nothing new. The launch check stays quiet
+    /// — an app that reports "you are up to date" every time it opens is noise —
+    /// but a button the user pressed has to answer.
+    /// </param>
+    private async Task CheckForUpdate(bool announce)
+    {
+        CheckUpdateButton.IsEnabled = false;
+        if (announce) UpdateStatusText.Text = "Checking…";
+
+        _update = await Updater.CheckAsync();
+
+        CheckUpdateButton.IsEnabled = true;
+
+        if (_update is not { } update)
+        {
+            if (announce) UpdateStatusText.Text = $"Running {Updater.Version} — nothing newer.";
+            return;
+        }
+
+        UpdateStatusText.Text = $"Running {Updater.Version}.";
+        UpdateHeadlineText.Text = $"{update.Version} is available  ·  {update.SizeText}";
+        UpdateBox.IsVisible = true;
+    }
+
+    private async Task InstallUpdate()
+    {
+        if (_update is not { } update) return;
+
+        InstallUpdateButton.IsEnabled = false;
+        CheckUpdateButton.IsEnabled = false;
+
+        UpdateProgress.IsVisible = true;
+        UpdateProgress.Value = 0;
+
+        var progress = new Progress<double>(fraction =>
+            UpdateProgress.Value = Math.Clamp(fraction, 0, 1));
+
+        UpdateHeadlineText.Text = $"Downloading {update.Version}…";
+
+        string? failure = await Updater.InstallAsync(update, progress);
+
+        if (failure == null)
+        {
+            // The swap script is waiting for this process to go away before it
+            // touches the bundle, so closing is the last step of the install
+            // rather than a courtesy.
+            UpdateHeadlineText.Text = "Installing. Jinxy will reopen by itself.";
+            Close();
+            return;
+        }
+
+        UpdateProgress.IsVisible = false;
+        UpdateHeadlineText.Text = failure;
+
+        InstallUpdateButton.IsEnabled = true;
+        CheckUpdateButton.IsEnabled = true;
+    }
     // ---- Roblox cache ----
 
     private void WireCache()

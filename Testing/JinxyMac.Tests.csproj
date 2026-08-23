@@ -20,6 +20,8 @@
     <Compile Include="../Core/Presets.Tests.cs" />
     <Compile Include="../Core/ClickHistory.cs" />
     <Compile Include="../Core/ClickHistory.Tests.cs" />
+    <Compile Include="../Core/Updater.cs" />
+    <Compile Include="../Core/Updater.Tests.cs" />
     <Compile Include="../Core/RobloxCache.cs" />
     <Compile Include="../Core/RobloxCache.Tests.cs" />
     <Compile Include="../Core/Notify.cs" />

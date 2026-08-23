@@ -1051,6 +1051,46 @@
 
                         <Border Classes="card">
                             <StackPanel>
+                                <DockPanel LastChildFill="False">
+                                    <TextBlock Text="UPDATES" Foreground="{DynamicResource TextMuted}"
+                                               FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <Button Name="CheckUpdateButton" DockPanel.Dock="Right"
+                                            Content="Check now" Padding="14,6" FontSize="11"/>
+                                </DockPanel>
+
+                                <TextBlock Name="UpdateStatusText" Classes="hint"/>
+
+                                <Border Name="UpdateBox" IsVisible="False"
+                                        Background="{DynamicResource Sunken}"
+                                        BorderBrush="{DynamicResource Accent}" BorderThickness="1"
+                                        CornerRadius="8" Padding="14" Margin="0,12,0,0">
+                                    <StackPanel>
+                                        <TextBlock Name="UpdateHeadlineText" FontWeight="SemiBold"/>
+                                        <TextBlock Name="UpdateWarningText" Classes="hint"
+                                                   Text="Installing replaces the app, and because this build is unsigned macOS will treat it as a new one — you will have to grant Accessibility again afterwards, or clicking will silently stop working."/>
+
+                                        <ProgressBar Name="UpdateProgress" IsVisible="False"
+                                                     Minimum="0" Maximum="1" Height="4"
+                                                     Margin="0,12,0,0"
+                                                     Foreground="{DynamicResource Accent}"/>
+
+                                        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                            <Button Name="InstallUpdateButton" Content="Install and restart"
+                                                    Classes="accent" Padding="16,7" Margin="0,0,10,0"
+                                                    VerticalContentAlignment="Center"/>
+                                            <Button Name="ViewUpdateButton" Content="What changed"
+                                                    Padding="14,6" FontSize="11"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+
+                                <CheckBox Name="AutoCheckUpdates" Content="Check for updates on launch"
+                                          IsChecked="True" Margin="0,14,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card">
+                            <StackPanel>
                                 <TextBlock Text="ABOUT" Foreground="{DynamicResource TextMuted}"
                                            FontSize="10" FontWeight="Bold"/>
                                 <TextBlock Name="AboutText" Classes="hint"/>

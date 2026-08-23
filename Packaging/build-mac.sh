@@ -47,7 +47,16 @@ for arch in arm64 x64; do
 done
 
 echo "==> Assembling the bundle"
-cp "$here/Info.plist" "$app/Contents/Info.plist"
+
+# The version is written once, in Updater.cs, and stamped into the plist here.
+# Kept in both places by hand they drift, and the first symptom of that is an
+# updater cheerfully offering the version already installed, for ever.
+version=$(grep -oE 'Version = "[0-9.]+"' "$project/Core/Updater.cs" | grep -oE '[0-9.]+')
+[ -n "$version" ] || { echo "Could not read the version out of Updater.cs"; exit 1; }
+echo "    version $version"
+
+sed "s|<string>1\.0\.0</string>|<string>$version</string>|g" \
+    "$here/Info.plist" > "$app/Contents/Info.plist"
 cp "$here/JinxyMac.icns" "$app/Contents/Resources/JinxyMac.icns"
 
 # Written with unix line endings whatever this file was saved as. A CRLF in the
