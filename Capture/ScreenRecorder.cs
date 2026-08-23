@@ -39,13 +39,36 @@ public sealed class ScreenRecorder : IDisposable
     public string LastError { get; private set; } = "";
 
     /// <summary>Where clips go, per platform convention.</summary>
-    public static string DefaultFolder => OperatingSystem.IsMacOS()
-        ? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            "Movies", "Jinxy Clips")
-        : Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyVideos),
-            "Jinxy Clips");
+    /// <remarks>
+    /// The home directory is asked for twice, because the first answer can be
+    /// empty. GetFolderPath reads HOME, and a process launched in an unusual
+    /// way may not have it — at which point Path.Combine happily returns a
+    /// relative path and clips land wherever the working directory happens to
+    /// be, which for a Finder-launched app is the root of the disk.
+    /// </remarks>
+    public static string DefaultFolder
+    {
+        get
+        {
+            string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+            if (string.IsNullOrWhiteSpace(home))
+                home = Environment.GetEnvironmentVariable("HOME") ?? "";
+
+            if (OperatingSystem.IsMacOS())
+            {
+                return home.Length > 0
+                    ? Path.Combine(home, "Movies", "Jinxy Clips")
+                    : "/tmp/Jinxy Clips";
+            }
+
+            string videos = Environment.GetFolderPath(Environment.SpecialFolder.MyVideos);
+
+            if (videos.Length == 0) videos = home;
+
+            return Path.Combine(videos, "Jinxy Clips");
+        }
+    }
 
     public async Task<string> StartAsync(string outputDirectory, int framesPerSecond,
                                          CaptureDevice? screen = null)

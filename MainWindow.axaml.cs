@@ -55,6 +55,9 @@ public partial class MainWindow : Window
 
     /// <summary>The clip the uploader is pointed at, if any.</summary>
     private string? _clip;
+
+    /// <summary>The most recently saved clip, for the Show in Finder button.</summary>
+    private string? _lastClip;
     private bool _historyDirty;
     private bool _valuesHidden;
 
@@ -1307,6 +1310,7 @@ public partial class MainWindow : Window
         RecordButton.Click += async (_, _) => await ToggleRecording();
         RescanButton.Click += async (_, _) => await RescanScreens();
         OpenClipsButton.Click += (_, _) => Reveal(ClipFolder);
+        RevealClipButton.Click += (_, _) => RevealClip();
 
         Rate(Fps30, 30);
         Rate(Fps60, 60);
@@ -1609,7 +1613,8 @@ public partial class MainWindow : Window
                     // Offered straight to the uploader, because the clip someone
                     // wants to share is almost always the one just recorded.
                     Choose(clip);
-                    RecordStatus.Text = "Saved " + System.IO.Path.GetFileName(clip);
+                    Announce(clip);
+                    RecordStatus.Text = "";
 
                     Notify.Send("Recording saved", System.IO.Path.GetFileName(clip));
                 }
@@ -1737,7 +1742,8 @@ public partial class MainWindow : Window
             else
             {
                 Choose(clip);
-                ReplayStatusText.Text = "Saved " + System.IO.Path.GetFileName(clip);
+                Announce(clip);
+                ReplayStatusText.Text = "";
 
                 // The one that most needs saying out loud: the key was pressed
                 // mid-game with this window behind Roblox.
@@ -1777,6 +1783,58 @@ public partial class MainWindow : Window
         string? path = picked[0].TryGetLocalPath();
 
         if (path != null) Choose(path);
+    }
+
+    /// <summary>
+    /// Announces where a clip landed, with a way to go there.
+    /// </summary>
+    /// <remarks>
+    /// The full path, not the filename. A recorder that reports
+    /// "Saved clip-2026-08-23-191327.mp4" has told the user nothing they can
+    /// act on — the folder is the part they are missing, and on macOS
+    /// ~/Movies is not somewhere people browse by habit.
+    /// </remarks>
+    private void Announce(string clip)
+    {
+        SavedNameText.Text = "Saved " + System.IO.Path.GetFileName(clip);
+        SavedPathText.Text = clip;
+        SavedBox.IsVisible = true;
+
+        RevealClipButton.IsEnabled = true;
+        _lastClip = clip;
+    }
+
+    /// <summary>Opens Finder with the clip itself selected, not just its folder.</summary>
+    private void RevealClip()
+    {
+        if (_lastClip == null) return;
+
+        try
+        {
+            // open -R selects the file in its folder, which is the difference
+            // between "here is the folder" and "here is your clip".
+            var info = new ProcessStartInfo(OperatingSystem.IsMacOS() ? "/usr/bin/open" : "explorer.exe")
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            if (OperatingSystem.IsMacOS())
+            {
+                info.ArgumentList.Add("-R");
+                info.ArgumentList.Add(_lastClip);
+            }
+            else
+            {
+                info.ArgumentList.Add("/select," + _lastClip);
+            }
+
+            Process.Start(info);
+        }
+        catch
+        {
+            // The path is on screen and selectable either way.
+        }
     }
 
     /// <summary>Points the uploader at a file, without uploading it.</summary>
