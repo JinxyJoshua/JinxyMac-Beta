@@ -2427,6 +2427,12 @@ public partial class MainWindow : Window
 
         RecheckPermissionsButton.Click += (_, _) => DescribePermissions();
 
+        OpenAccessPaneButton.Click += (_, _) =>
+            Open("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility");
+
+        OpenScreenPaneButton.Click += (_, _) =>
+            Open("x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture");
+
         AskScreenButton.Click += (_, _) =>
         {
             MacPermissions.RequestScreenRecording();
@@ -2563,6 +2569,8 @@ public partial class MainWindow : Window
         // macOS only shows its own prompt once per install; after that the
         // button is useless and the pane name is the only way through.
         AskScreenButton.IsVisible = screen == Permission.Denied;
+        OpenScreenPaneButton.IsVisible = screen == Permission.Denied;
+        OpenAccessPaneButton.IsVisible = MacPermissions.Accessibility() == Permission.Denied;
 
         void Show(Permission state, TextBlock label, TextBlock detail, string granted, string denied)
         {
