@@ -604,11 +604,16 @@
                                                          Foreground="{DynamicResource Text}"/>
                                 </Border>
                                 <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                    <Button Name="InstallFfmpegButton" Content="Install it for me"
+                                            Classes="accent" Padding="16,7" Margin="0,0,10,0"
+                                            VerticalContentAlignment="Center"/>
                                     <Button Name="CopyFfmpegButton" Content="Copy command"
                                             Padding="14,6" FontSize="11" Margin="0,0,10,0"/>
                                     <Button Name="RecheckFfmpegButton" Content="Check again"
                                             Padding="14,6" FontSize="11"/>
                                 </StackPanel>
+
+                                <TextBlock Name="FfmpegStepText" Classes="hint"/>
                             </StackPanel>
                         </Border>
 

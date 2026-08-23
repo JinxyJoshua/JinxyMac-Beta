@@ -1273,6 +1273,8 @@ public partial class MainWindow : Window
 
         RecheckFfmpegButton.Click += async (_, _) => await RescanScreens();
 
+        InstallFfmpegButton.Click += (_, _) => InstallFfmpeg();
+
         CopyFfmpegButton.Click += async (_, _) =>
         {
             if (Clipboard != null) await Clipboard.SetTextAsync(Ffmpeg.InstallHint);
@@ -1359,6 +1361,7 @@ public partial class MainWindow : Window
 
             FfmpegCommandText.Text = Ffmpeg.InstallHint;
             FfmpegBanner.IsVisible = true;
+            ShowInstallStep();
 
             return;
         }
@@ -1420,6 +1423,63 @@ public partial class MainWindow : Window
         _loading = was;
 
         RefreshReplay();
+    }
+
+    /// <summary>
+    /// Says what the install button is actually going to do.
+    /// </summary>
+    /// <remarks>
+    /// Which depends on whether Homebrew is there. Offering "Install it for me"
+    /// on a machine without brew would open a Terminal that immediately says
+    /// command not found, which is a worse answer than the one the button
+    /// promised.
+    /// </remarks>
+    private void ShowInstallStep()
+    {
+        bool brew = Ffmpeg.Homebrew() != null;
+
+        InstallFfmpegButton.Content = brew ? "Install it for me" : "Get Homebrew first";
+
+        FfmpegStepText.Text = brew
+            ? "Opens Terminal and runs the command there, so you can watch it and stop it. "
+              + "It takes a few minutes. Come back and press Check again when it finishes."
+            : "ffmpeg comes from Homebrew, which is not installed either. This opens brew.sh — "
+              + "install that first, then come back and this button will finish the job.";
+    }
+
+    /// <summary>
+    /// Runs the install, or sends the user to get the thing that runs it.
+    /// </summary>
+    /// <remarks>
+    /// Never silently. The app does not install software the user did not press
+    /// a button for and cannot watch — and it does not pipe a script from the
+    /// internet into a shell on their behalf, which is what installing Homebrew
+    /// itself would mean.
+    /// </remarks>
+    private void InstallFfmpeg()
+    {
+        if (Ffmpeg.Homebrew() == null)
+        {
+            Open("https://brew.sh");
+            return;
+        }
+
+        FfmpegStepText.Text = Ffmpeg.OpenInstaller()
+            ? "Terminal is running the install. Press Check again once it finishes."
+            : "Terminal would not open. Copy the command and run it yourself.";
+    }
+
+    /// <summary>Opens a link in the default browser.</summary>
+    private static void Open(string url)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch
+        {
+            // A link that will not open is not worth a crash.
+        }
     }
 
     private RadioButton ScreenButton(CaptureDevice screen)

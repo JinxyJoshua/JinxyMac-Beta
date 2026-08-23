@@ -27,6 +27,80 @@ public static class Ffmpeg
         ? "brew install ffmpeg"
         : "Put ffmpeg.exe in an 'ffmpeg' folder next to the app.";
 
+    /// <summary>Homebrew's own binary, if it is installed.</summary>
+    /// <remarks>
+    /// Two fixed paths rather than PATH. Homebrew lives at one of exactly two
+    /// prefixes — /opt/homebrew on Apple silicon, /usr/local on Intel — and a
+    /// GUI app launched from Finder inherits a PATH that usually contains
+    /// neither.
+    /// </remarks>
+    public static string? Homebrew()
+    {
+        if (!OperatingSystem.IsMacOS()) return null;
+
+        foreach (string candidate in new[] { "/opt/homebrew/bin/brew", "/usr/local/bin/brew" })
+        {
+            try
+            {
+                if (File.Exists(candidate)) return candidate;
+            }
+            catch
+            {
+                // Unreadable is not installed, for this purpose.
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Opens Terminal with the install command running in it.
+    /// </summary>
+    /// <remarks>
+    /// In Terminal, visibly, rather than silently from inside the app — and
+    /// that is the whole design, not a shortcut.
+    ///
+    /// Installing ffmpeg takes minutes, prints a great deal, and occasionally
+    /// asks something. Run hidden behind a spinner it would look frozen, and a
+    /// prompt nobody can see is a hang. Run in Terminal the user watches the
+    /// same output they would have got typing it, can stop it, and is left with
+    /// a window that explains itself if it fails.
+    ///
+    /// It also keeps this honest: the app never installs anything the user did
+    /// not watch it install.
+    /// </remarks>
+    /// <returns>False if Terminal could not be opened at all.</returns>
+    public static bool OpenInstaller()
+    {
+        if (!OperatingSystem.IsMacOS()) return false;
+
+        try
+        {
+            const string script =
+                "tell application \"Terminal\"\n"
+                + "  activate\n"
+                + "  do script \"brew install ffmpeg\"\n"
+                + "end tell";
+
+            var info = new ProcessStartInfo("/usr/bin/osascript")
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardError = true,
+                RedirectStandardOutput = true
+            };
+
+            info.ArgumentList.Add("-e");
+            info.ArgumentList.Add(script);
+
+            return Process.Start(info) != null;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public static string? Find()
     {
         if (_searched) return _cached;
