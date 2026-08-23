@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <!-- No -windows suffix and no WPF. This is a separate application that
+         shares JinxyClicker's design and its portable logic, not a port of a
+         codebase that cannot leave Windows. -->
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>JinxyMac</AssemblyName>
+    <RootNamespace>JinxyMac</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      Tests sit next to the code they cover. They are compiled by
+      Testing/JinxyMac.Tests.csproj, which links them in by source, so the app
+      must not pick them up — it has no test framework referenced.
+    -->
+    <Compile Remove="**/*.Tests.cs" />
+    <!-- A nested project's obj/ would otherwise be globbed into this one. -->
+    <Compile Remove="Testing/**" />
+    <None Remove="Testing/**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.0" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.0" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.0" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.0" />
+    <!-- Linux-only transitive dependency, never loaded on Windows or macOS,
+         pinned past a published advisory so the graph is clean. -->
+    <PackageReference Include="Tmds.DBus.Protocol" Version="0.21.3" />
+  </ItemGroup>
+
+</Project>

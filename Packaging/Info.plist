@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>Jinxy AutoClicker</string>
+
+    <key>CFBundleDisplayName</key>
+    <string>Jinxy AutoClicker</string>
+
+    <!-- The launcher script, not a binary. It picks the architecture. -->
+    <key>CFBundleExecutable</key>
+    <string>JinxyMac</string>
+
+    <key>CFBundleIdentifier</key>
+    <string>com.jinxyjoshua.jinxymac</string>
+
+    <key>CFBundleIconFile</key>
+    <string>JinxyMac</string>
+
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+
+    <key>CFBundleVersion</key>
+    <string>1.0.0</string>
+
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+
+    <!--
+        Every Mac .NET 10 supports. Set lower and the app launches on a system
+        the runtime cannot start on, which fails as an unreadable dyld error
+        instead of a sentence from the system saying the OS is too old.
+    -->
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
+
+    <key>NSHighResolutionCapable</key>
+    <true/>
+
+    <!--
+        Not a background-only app: it has a window and belongs in the Dock.
+        The menu bar item is in addition to that, not instead of it.
+    -->
+    <key>LSUIElement</key>
+    <false/>
+
+    <!--
+        macOS kills an app that touches the camera or microphone with no reason
+        declared. Nothing here wants either, but avfoundation enumerates capture
+        devices to find the screens and the camera sits on that same list, so
+        the strings are here rather than discovered missing by a crash.
+    -->
+    <key>NSCameraUsageDescription</key>
+    <string>Jinxy lists capture devices to find your screens. It does not record from a camera.</string>
+
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Jinxy lists capture devices to find your screens. It does not record audio.</string>
+
+    <!--
+        Screen Recording and Accessibility are granted through System Settings
+        rather than an Info.plist key, so there is nothing to declare for them
+        here. The app checks both at runtime and says which is missing.
+    -->
+</dict>
+</plist>

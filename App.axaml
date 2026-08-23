@@ -1,0 +1,50 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="JinxyMac.App"
+             RequestedThemeVariant="Dark">
+
+    <Application.Styles>
+        <FluentTheme />
+    </Application.Styles>
+
+    <Application.Resources>
+        <!-- The same palette as the Windows app, as Colors behind brushes, so
+             the accent can be moved at runtime without touching every brush. -->
+        <Color x:Key="AccentColor">#FF4B52</Color>
+        <Color x:Key="BackdropColor">#0F141D</Color>
+        <Color x:Key="PanelColor">#1A2230</Color>
+        <Color x:Key="Panel2Color">#151C27</Color>
+        <Color x:Key="RailColor">#151B25</Color>
+        <Color x:Key="SunkenColor">#101620</Color>
+        <Color x:Key="ControlColor">#202A39</Color>
+        <Color x:Key="ControlAltColor">#1E2634</Color>
+        <Color x:Key="TrackColor">#2A3445</Color>
+        <Color x:Key="DividerColor">#232E3E</Color>
+        <Color x:Key="HairlineColor">#1AFFFFFF</Color>
+        <Color x:Key="HoverColor">#0DFFFFFF</Color>
+        <Color x:Key="TextColor">#E9EDF4</Color>
+        <Color x:Key="TextBrightColor">#FFFFFF</Color>
+        <Color x:Key="TextSoftColor">#AAB4C5</Color>
+        <Color x:Key="TextDimColor">#C3CDDD</Color>
+        <Color x:Key="TextMutedColor">#8D98AA</Color>
+
+        <SolidColorBrush x:Key="Accent" Color="{DynamicResource AccentColor}"/>
+        <SolidColorBrush x:Key="Backdrop" Color="{DynamicResource BackdropColor}"/>
+        <SolidColorBrush x:Key="Panel" Color="{DynamicResource PanelColor}"/>
+        <SolidColorBrush x:Key="Panel2" Color="{DynamicResource Panel2Color}"/>
+        <SolidColorBrush x:Key="Rail" Color="{DynamicResource RailColor}"/>
+        <SolidColorBrush x:Key="Sunken" Color="{DynamicResource SunkenColor}"/>
+        <SolidColorBrush x:Key="Control" Color="{DynamicResource ControlColor}"/>
+        <SolidColorBrush x:Key="ControlAlt" Color="{DynamicResource ControlAltColor}"/>
+        <SolidColorBrush x:Key="Track" Color="{DynamicResource TrackColor}"/>
+        <SolidColorBrush x:Key="Divider" Color="{DynamicResource DividerColor}"/>
+        <SolidColorBrush x:Key="Hairline" Color="{DynamicResource HairlineColor}"/>
+        <SolidColorBrush x:Key="Hover" Color="{DynamicResource HoverColor}"/>
+        <SolidColorBrush x:Key="Text" Color="{DynamicResource TextColor}"/>
+        <SolidColorBrush x:Key="TextBright" Color="{DynamicResource TextBrightColor}"/>
+        <SolidColorBrush x:Key="TextSoft" Color="{DynamicResource TextSoftColor}"/>
+        <SolidColorBrush x:Key="TextDim" Color="{DynamicResource TextDimColor}"/>
+        <SolidColorBrush x:Key="TextMuted" Color="{DynamicResource TextMutedColor}"/>
+    </Application.Resources>
+
+</Application>

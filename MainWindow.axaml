@@ -1,0 +1,1026 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="JinxyMac.MainWindow"
+        Title="Jinxy AutoClicker"
+        Width="1180" Height="820"
+        MinWidth="1000" MinHeight="660"
+        Background="{DynamicResource Backdrop}"
+        Foreground="{DynamicResource Text}"
+        FontFamily="{DynamicResource ContentControlThemeFontFamily}">
+
+    <Window.Resources>
+        <!-- Fluent's own slider and checkbox keys, repointed at the palette.
+             Overriding the resources rather than the templates: the templates
+             are large, they change between Avalonia versions, and every part
+             worth recolouring is already named here. A key that no longer
+             exists is simply unused, so this degrades quietly rather than
+             throwing at load. -->
+        <SolidColorBrush x:Key="SliderTrackValueFill" Color="{DynamicResource AccentColor}"/>
+        <SolidColorBrush x:Key="SliderTrackValueFillPointerOver" Color="{DynamicResource AccentColor}"/>
+        <SolidColorBrush x:Key="SliderTrackValueFillPressed" Color="{DynamicResource AccentColor}"/>
+        <SolidColorBrush x:Key="SliderTrackFill" Color="{DynamicResource TrackColor}"/>
+        <SolidColorBrush x:Key="SliderTrackFillPointerOver" Color="{DynamicResource TrackColor}"/>
+        <SolidColorBrush x:Key="SliderTrackFillPressed" Color="{DynamicResource TrackColor}"/>
+        <SolidColorBrush x:Key="SliderThumbBackground" Color="White"/>
+        <SolidColorBrush x:Key="SliderThumbBackgroundPointerOver" Color="{DynamicResource AccentColor}"/>
+        <SolidColorBrush x:Key="SliderThumbBackgroundPressed" Color="{DynamicResource AccentColor}"/>
+
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillChecked" Color="{DynamicResource AccentColor}"/>
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPointerOver" Color="{DynamicResource AccentColor}"/>
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPressed" Color="{DynamicResource AccentColor}"/>
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeChecked" Color="{DynamicResource AccentColor}"/>
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPointerOver" Color="{DynamicResource AccentColor}"/>
+    </Window.Resources>
+
+    <Window.Styles>
+        <!-- Sidebar entries -->
+        <Style Selector="RadioButton.nav">
+            <Setter Property="Padding" Value="16,11"/>
+            <Setter Property="Margin" Value="10,1"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSoft}"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Name="Chrome" Background="Transparent" CornerRadius="8">
+                        <Grid ColumnDefinitions="3,*">
+                            <Border Name="Bar" Grid.Column="0" Width="3" CornerRadius="2"
+                                    Background="Transparent" Margin="0,8"/>
+                            <ContentPresenter Grid.Column="1"
+                                              Content="{TemplateBinding Content}"
+                                              Padding="{TemplateBinding Padding}"
+                                              VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="RadioButton.nav:pointerover /template/ Border#Chrome">
+            <Setter Property="Background" Value="{DynamicResource Hover}"/>
+        </Style>
+        <Style Selector="RadioButton.nav:checked /template/ Border#Chrome">
+            <Setter Property="Background" Value="{DynamicResource ControlAlt}"/>
+        </Style>
+        <Style Selector="RadioButton.nav:checked /template/ Border#Bar">
+            <Setter Property="Background" Value="{DynamicResource Accent}"/>
+        </Style>
+        <Style Selector="RadioButton.nav:checked">
+            <Setter Property="Foreground" Value="{DynamicResource TextBright}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+
+        <!-- The card the clicker controls sit in. Bordered, unlike the plain
+             panels elsewhere — four of them tile into a grid and the edge is
+             what keeps them from reading as one surface. -->
+        <Style Selector="Border.card">
+            <Setter Property="Background" Value="{DynamicResource Panel}"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="20"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Divider}"/>
+            <Setter Property="Margin" Value="0,0,0,14"/>
+        </Style>
+
+        <Style Selector="Border.tile">
+            <Setter Property="Background" Value="{DynamicResource Panel}"/>
+            <Setter Property="CornerRadius" Value="11"/>
+            <Setter Property="Padding" Value="16"/>
+        </Style>
+
+        <!-- 14px semibold rather than 10px uppercase: at 10 the labels read as
+             a caption beside a 17px button, which made the cards look lopsided
+             rather than small. -->
+        <Style Selector="TextBlock.label">
+            <Setter Property="Foreground" Value="{DynamicResource TextDim}"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+
+        <Style Selector="TextBlock.hint">
+            <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Margin" Value="0,4,0,0"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+
+        <Style Selector="TextBlock.tiny">
+            <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
+            <Setter Property="FontSize" Value="9"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+
+        <Style Selector="TextBlock.value">
+            <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+
+        <!-- The number beside a slider, typeable. Right-aligned because these
+             are figures in a column, not labels. -->
+        <Style Selector="TextBox.valuebox">
+            <Setter Property="MinWidth" Value="92"/>
+            <Setter Property="Height" Value="40"/>
+            <Setter Property="Background" Value="{DynamicResource Sunken}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource Accent}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="TextAlignment" Value="Right"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="MaxLength" Value="7"/>
+            <Setter Property="MinHeight" Value="0"/>
+        </Style>
+        <Style Selector="TextBox.valuebox /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="{DynamicResource Sunken}"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+        </Style>
+        <Style Selector="TextBox.valuebox:pointerover /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="{DynamicResource Sunken}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Track}"/>
+        </Style>
+        <Style Selector="TextBox.valuebox:focus /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="{DynamicResource Sunken}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+        </Style>
+
+        <!-- Same box, sized to sit on a slider row without crowding the track. -->
+        <Style Selector="TextBox.pixelbox">
+            <Setter Property="MinWidth" Value="48"/>
+            <Setter Property="Width" Value="48"/>
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="MaxLength" Value="3"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="4,0"/>
+            <Setter Property="Margin" Value="8,0,0,0"/>
+        </Style>
+
+        <!-- Mutually exclusive segment. IsChecked carries the selection, so no
+             handler has to clear the previously selected button. -->
+        <Style Selector="RadioButton.segment">
+            <Setter Property="Background" Value="{DynamicResource Control}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text}"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="14,10"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
+            <Setter Property="MinWidth" Value="76"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Name="Root" CornerRadius="8" Background="{TemplateBinding Background}">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          Padding="{TemplateBinding Padding}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="RadioButton.segment:pointerover /template/ Border#Root">
+            <Setter Property="Background" Value="{DynamicResource Hover}"/>
+        </Style>
+        <Style Selector="RadioButton.segment:checked /template/ Border#Root">
+            <Setter Property="Background" Value="{DynamicResource Accent}"/>
+        </Style>
+        <Style Selector="RadioButton.segment:checked">
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+
+        <Style Selector="Button.accent">
+            <Setter Property="Background" Value="{DynamicResource Accent}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+
+        <Style Selector="Separator">
+            <Setter Property="Background" Value="{DynamicResource Hairline}"/>
+            <Setter Property="Height" Value="1"/>
+        </Style>
+    </Window.Styles>
+
+    <Grid ColumnDefinitions="196,*">
+
+        <!-- Sidebar -->
+        <Border Grid.Column="0" Background="{DynamicResource Rail}">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top" Margin="20,22,20,18">
+                    <TextBlock Text="Jinxy" FontSize="21" FontWeight="Bold"
+                               Foreground="{DynamicResource Text}"/>
+                    <TextBlock Text="MAC BUILD" FontSize="9" FontWeight="Bold"
+                               Foreground="{DynamicResource Accent}" Margin="0,3,0,0"/>
+                </StackPanel>
+
+                <StackPanel DockPanel.Dock="Top">
+                    <RadioButton Classes="nav" GroupName="Nav" Content="Clicker"
+                                 IsChecked="True" Name="NavClicker"/>
+                    <RadioButton Classes="nav" GroupName="Nav" Content="Presets" Name="NavPresets"/>
+                    <RadioButton Classes="nav" GroupName="Nav" Content="Recorder" Name="NavRecorder"/>
+                    <RadioButton Classes="nav" GroupName="Nav" Content="History" Name="NavHistory"/>
+                    <RadioButton Classes="nav" GroupName="Nav" Content="Theme" Name="NavTheme"/>
+                    <RadioButton Classes="nav" GroupName="Nav" Content="Settings" Name="NavSettings"/>
+                </StackPanel>
+
+                <TextBlock DockPanel.Dock="Bottom" Name="EngineNote"
+                           Margin="20,0,20,18" FontSize="10"
+                           Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap"/>
+            </DockPanel>
+        </Border>
+
+        <!-- Main -->
+        <Grid Grid.Column="1" Margin="22" RowDefinitions="Auto,*">
+
+            <!-- Two columns rather than overlapping panels in one cell, so the
+                 status block can never ride over the title at narrow widths. -->
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="2,0,2,18">
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock Name="PageTitleText" Text="Clicker" FontSize="30" FontWeight="Bold"/>
+                    <TextBlock Name="PageSubtitleText" Text="Configure your own click engine"
+                               Foreground="{DynamicResource TextMuted}" Margin="0,2,0,0"/>
+                </StackPanel>
+
+                <!-- Pill and button share an explicit height so they align.
+                     Only shown on the Clicker page. -->
+                <StackPanel Name="StatusBlock" Grid.Column="1"
+                            Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Name="HideValuesButton" Content="Hide values"
+                            Height="40" Padding="16,0" Margin="0,0,10,0"
+                            VerticalContentAlignment="Center"
+                            ToolTip.Tip="Masks the CPS and duty cycle so they are not readable on screen"/>
+                    <Border Background="{DynamicResource Panel2}" CornerRadius="8" Height="40"
+                            Padding="14,0" Margin="0,0,10,0" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Ellipse Name="StatusDot" Width="8" Height="8"
+                                     Fill="{DynamicResource TextMuted}"
+                                     VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock Name="StatusText" Text="IDLE" FontWeight="Bold"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                    <Button Name="StartStopButton" Content="START" Classes="accent"
+                            Width="120" Height="40" VerticalAlignment="Center"
+                            HorizontalContentAlignment="Center"
+                            VerticalContentAlignment="Center"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- One page visible at a time. Every page shares the header above. -->
+            <ScrollViewer Grid.Row="1">
+                <Panel>
+
+                    <!-- Clicker -->
+                    <StackPanel Name="PageClicker">
+
+                        <!-- Stats. Both tiles measure the whole machine, and say
+                             so — read as the app's own they would look alarming. -->
+                        <Grid ColumnDefinitions="*,14,*" Margin="0,0,0,14">
+                            <Border Grid.Column="0" Classes="tile">
+                                <StackPanel>
+                                    <TextBlock Text="CPU" Foreground="{DynamicResource TextMuted}"
+                                               FontSize="10" FontWeight="Bold"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                        <TextBlock Name="CpuText" Text="--%" FontSize="20" FontWeight="Bold"/>
+                                        <TextBlock Text="(All Processes)" VerticalAlignment="Bottom"
+                                                   Foreground="{DynamicResource TextMuted}"
+                                                   FontSize="11" Margin="7,0,0,3"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="2" Classes="tile">
+                                <StackPanel>
+                                    <TextBlock Text="RAM" Foreground="{DynamicResource TextMuted}"
+                                               FontSize="10" FontWeight="Bold"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                        <TextBlock Name="RamText" Text="-- GB" FontSize="20" FontWeight="Bold"/>
+                                        <TextBlock Text="(All Processes)" VerticalAlignment="Bottom"
+                                                   Foreground="{DynamicResource TextMuted}"
+                                                   FontSize="11" Margin="7,0,0,3"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <!-- Keybind / Mode on the left, the two rates on the right. -->
+                        <Grid ColumnDefinitions="*,14,*" RowDefinitions="Auto,Auto">
+
+                            <Border Grid.Row="0" Grid.Column="0" Classes="card">
+                                <StackPanel>
+                                    <DockPanel LastChildFill="False">
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="KEYBIND" Classes="label"/>
+                                            <TextBlock Text="Starts and stops clicking" Classes="hint"/>
+                                        </StackPanel>
+                                        <Button Name="HotkeyButton" Content="Not set"
+                                                DockPanel.Dock="Right" VerticalAlignment="Center"
+                                                ToolTip.Tip="Click, then press a key"
+                                                FontSize="17" FontWeight="Bold"
+                                                Height="42" MinWidth="96" Padding="16,0"
+                                                HorizontalContentAlignment="Center"
+                                                VerticalContentAlignment="Center"/>
+                                    </DockPanel>
+
+                                    <Separator Margin="0,12,0,10"/>
+
+                                    <DockPanel LastChildFill="False">
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="AUTOCLICKER + SHAKE" Classes="label"/>
+                                            <TextBlock Text="Starts and stops both together" Classes="hint"/>
+                                        </StackPanel>
+                                        <Button Name="ComboHotkeyButton" Content="Not set"
+                                                DockPanel.Dock="Right" VerticalAlignment="Center"
+                                                ToolTip.Tip="Click, then press a key"
+                                                FontSize="17" FontWeight="Bold"
+                                                Height="42" MinWidth="96" Padding="16,0"
+                                                HorizontalContentAlignment="Center"
+                                                VerticalContentAlignment="Center"/>
+                                    </DockPanel>
+
+                                    <Separator Margin="0,12,0,10"/>
+
+                                    <DockPanel LastChildFill="False">
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="BUILDING" Classes="label"/>
+                                            <TextBlock Name="BuildRateText" Classes="hint"
+                                                       Text="Fixed 35 CPS at 1% — Ignores the sliders"/>
+                                        </StackPanel>
+                                        <Button Name="BuildHotkeyButton" Content="Not set"
+                                                DockPanel.Dock="Right" VerticalAlignment="Center"
+                                                ToolTip.Tip="Click, then press a key"
+                                                FontSize="17" FontWeight="Bold"
+                                                Height="42" MinWidth="96" Padding="16,0"
+                                                HorizontalContentAlignment="Center"
+                                                VerticalContentAlignment="Center"/>
+                                    </DockPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Row="0" Grid.Column="2" Classes="card">
+                                <StackPanel>
+                                    <DockPanel LastChildFill="False">
+                                        <TextBlock Text="CPS" Classes="label" VerticalAlignment="Center"/>
+                                        <TextBox Name="CpsValue" DockPanel.Dock="Right"
+                                                 Text="10.00" Classes="valuebox"/>
+                                    </DockPanel>
+                                    <!-- 0 CPS means armed but idle; see the click loop. -->
+                                    <Slider Name="CpsSlider" Minimum="0" Maximum="1000" Value="10"
+                                            Margin="0,10,0,0"/>
+                                    <!-- Clicks actually delivered, not clicks requested. -->
+                                    <TextBlock Name="MeasuredText" Text="Measured — /s"
+                                               Classes="hint" Margin="0,8,0,0"/>
+                                    <!-- Only shown while something is overriding the sliders. -->
+                                    <TextBlock Name="ClampText" IsVisible="False"
+                                               Foreground="{DynamicResource Accent}"
+                                               FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Row="1" Grid.Column="0" Classes="card">
+                                <DockPanel LastChildFill="False">
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="MODE" Classes="label"/>
+                                        <TextBlock Text="Hold the key, or press to latch" Classes="hint"/>
+                                    </StackPanel>
+                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
+                                                VerticalAlignment="Center">
+                                        <RadioButton Name="HoldModeButton" GroupName="ClickMode"
+                                                     Classes="segment" Content="Hold"/>
+                                        <RadioButton Name="ToggleModeButton" GroupName="ClickMode"
+                                                     Classes="segment" Content="Toggle"
+                                                     IsChecked="True" Margin="0"/>
+                                    </StackPanel>
+                                </DockPanel>
+                            </Border>
+
+                            <Border Grid.Row="1" Grid.Column="2" Classes="card">
+                                <StackPanel>
+                                    <DockPanel LastChildFill="False">
+                                        <TextBlock Text="DUTY CYCLE" Classes="label" VerticalAlignment="Center"/>
+                                        <!-- Declared before the box so it docks furthest right. -->
+                                        <TextBlock Text="%" DockPanel.Dock="Right" Margin="4,0,0,0"
+                                                   Foreground="{DynamicResource Accent}"
+                                                   FontWeight="Bold" FontSize="16"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBox Name="DutyValue" DockPanel.Dock="Right"
+                                                 Text="50.00" Classes="valuebox"/>
+                                    </DockPanel>
+                                    <Slider Name="DutySlider" Minimum="0" Maximum="100" Value="50"
+                                            Margin="0,10,0,0"/>
+                                    <TextBlock Text="Share of each cycle the button stays held"
+                                               Classes="hint" Margin="0,8,0,0"/>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <!-- Precision -->
+                        <Border Classes="card">
+                            <StackPanel>
+                                <TextBlock Text="PRECISION" Foreground="{DynamicResource TextMuted}"
+                                           FontSize="10" FontWeight="Bold" Margin="0,0,0,4"/>
+
+                                <Grid Margin="0,7">
+                                    <StackPanel Margin="0,0,44,0">
+                                        <TextBlock Text="Ultra Accuracy" FontWeight="SemiBold"/>
+                                        <TextBlock Text="Spin-waits for even click spacing. Costs up to a third of a core"
+                                                   Foreground="{DynamicResource TextMuted}" FontSize="11"
+                                                   TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <CheckBox Name="SpinToggle" HorizontalAlignment="Right"
+                                              VerticalAlignment="Center"/>
+                                </Grid>
+
+                                <Separator/>
+
+                                <Grid Margin="0,7">
+                                    <StackPanel Margin="0,0,44,0">
+                                        <TextBlock Text="Shaky Tracking" FontWeight="SemiBold"/>
+                                        <TextBlock Name="ShakeStatusText"
+                                                   Text="Moves the camera a few pixels while the clicker runs"
+                                                   Foreground="{DynamicResource TextMuted}" FontSize="11"
+                                                   TextWrapping="Wrap"/>
+
+                                        <!-- Travel in each direction in pixels, and how often it
+                                             moves. One row per value: label, slider, readout. -->
+                                        <StackPanel Margin="0,10,16,2">
+                                            <Grid ColumnDefinitions="52,*,Auto" Margin="0,4,0,0">
+                                                <TextBlock Grid.Column="0" Text="LEFT" Classes="tiny"
+                                                           VerticalAlignment="Center"/>
+                                                <Slider Grid.Column="1" Name="ShakeLeftSlider"
+                                                        Minimum="0" Maximum="100" Value="7"
+                                                        VerticalAlignment="Center"/>
+                                                <TextBox Grid.Column="2" Name="ShakeLeftValue" Text="7"
+                                                         Classes="valuebox pixelbox"/>
+                                            </Grid>
+
+                                            <Grid ColumnDefinitions="52,*,Auto" Margin="0,4,0,0">
+                                                <TextBlock Grid.Column="0" Text="RIGHT" Classes="tiny"
+                                                           VerticalAlignment="Center"/>
+                                                <Slider Grid.Column="1" Name="ShakeRightSlider"
+                                                        Minimum="0" Maximum="100" Value="9"
+                                                        VerticalAlignment="Center"/>
+                                                <TextBox Grid.Column="2" Name="ShakeRightValue" Text="9"
+                                                         Classes="valuebox pixelbox"/>
+                                            </Grid>
+
+                                            <Grid ColumnDefinitions="52,*,Auto" Margin="0,4,0,0">
+                                                <TextBlock Grid.Column="0" Text="UP" Classes="tiny"
+                                                           VerticalAlignment="Center"/>
+                                                <Slider Grid.Column="1" Name="ShakeUpSlider"
+                                                        Minimum="0" Maximum="100" Value="6"
+                                                        VerticalAlignment="Center"/>
+                                                <TextBox Grid.Column="2" Name="ShakeUpValue" Text="6"
+                                                         Classes="valuebox pixelbox"/>
+                                            </Grid>
+
+                                            <Grid ColumnDefinitions="52,*,Auto" Margin="0,4,0,0">
+                                                <TextBlock Grid.Column="0" Text="DOWN" Classes="tiny"
+                                                           VerticalAlignment="Center"/>
+                                                <Slider Grid.Column="1" Name="ShakeDownSlider"
+                                                        Minimum="0" Maximum="100" Value="5"
+                                                        VerticalAlignment="Center"/>
+                                                <TextBox Grid.Column="2" Name="ShakeDownValue" Text="5"
+                                                         Classes="valuebox pixelbox"/>
+                                            </Grid>
+
+                                            <Separator Margin="0,10,0,4"/>
+
+                                            <Grid ColumnDefinitions="52,*,Auto" Margin="0,4,0,0">
+                                                <TextBlock Grid.Column="0" Text="SPEED" Classes="tiny"
+                                                           VerticalAlignment="Center"/>
+                                                <Slider Grid.Column="1" Name="ShakeSpeedSlider"
+                                                        Minimum="5" Maximum="50" Value="50"
+                                                        VerticalAlignment="Center"/>
+                                                <TextBox Grid.Column="2" Name="ShakeSpeedValue" Text="50"
+                                                         Classes="valuebox pixelbox"
+                                                         ToolTip.Tip="Movements per second"/>
+                                            </Grid>
+
+                                            <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                                <Button Name="SaveShakeButton" Content="Save"
+                                                        ToolTip.Tip="Remember these values"
+                                                        Padding="12,5" Margin="0,0,8,0" FontSize="11"/>
+                                                <Button Name="RestoreShakeButton" Content="Restore"
+                                                        Padding="12,5" Margin="0" FontSize="11"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <CheckBox Name="ShakeToggle" HorizontalAlignment="Right"
+                                              VerticalAlignment="Top" Margin="0,1,0,0"/>
+                                </Grid>
+
+                                <Separator/>
+
+                                <Grid Margin="0,7">
+                                    <StackPanel Margin="0,0,44,0">
+                                        <TextBlock Text="HitFix" FontWeight="SemiBold"/>
+                                        <TextBlock Text="Holds every click long enough for the game to read it. Caps very high CPS"
+                                                   Foreground="{DynamicResource TextMuted}" FontSize="11"
+                                                   TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <CheckBox Name="HitFixToggle" IsChecked="True"
+                                              HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- Presets -->
+                    <StackPanel Name="PagePresets" IsVisible="False">
+                        <ItemsControl Name="PresetList" Margin="0,0,0,14">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+
+                        <TextBlock Name="NoPresetsText" Classes="hint" Margin="0,0,0,14"
+                                   IsVisible="False"
+                                   Text="No presets. Make one below, or restore the ones the app ships with."/>
+
+                        <Border Classes="card">
+                            <StackPanel>
+                                <TextBlock Text="CUSTOM PRESET" Classes="label"/>
+                                <TextBlock Name="CustomHint" Classes="hint"
+                                           Text="Name it, set CPS and CDC, and it is saved between sessions"/>
+
+                                <Grid ColumnDefinitions="*,10,110,10,110,10,Auto" Margin="0,14,0,0">
+                                    <StackPanel Grid.Column="0">
+                                        <TextBox Name="PresetNameBox" Watermark="Name"/>
+                                        <TextBlock Text="NAME" Classes="tiny" Margin="0,6,0,0"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBox Name="PresetCpsBox" Watermark="0.00"/>
+                                        <TextBlock Text="CPS" Classes="tiny" Margin="0,6,0,0"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="4">
+                                        <TextBox Name="PresetCdcBox" Watermark="0.00"/>
+                                        <TextBlock Text="CDC %" Classes="tiny" Margin="0,6,0,0"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="6" Name="SavePresetButton" Content="+  Save"
+                                            Classes="accent" VerticalAlignment="Top" Padding="20,7"/>
+                                </Grid>
+
+                                <TextBlock Name="PresetError" Classes="hint" IsVisible="False"
+                                           Foreground="{DynamicResource Accent}" Margin="0,10,0,0"/>
+
+                                <DockPanel LastChildFill="False" Margin="0,14,0,0">
+                                    <Button Name="FromSlidersButton" Content="Take the current sliders"
+                                            Padding="14,6" FontSize="11"/>
+                                    <Button Name="RestorePresetsButton" DockPanel.Dock="Right"
+                                            Content="Restore defaults" Padding="14,6" FontSize="11"/>
+                                </DockPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- Recorder -->
+                    <StackPanel Name="PageRecorder" IsVisible="False">
+
+                        <Border Classes="card">
+                            <StackPanel>
+                                <TextBlock Text="RECORD" Foreground="{DynamicResource TextMuted}"
+                                           FontSize="10" FontWeight="Bold"/>
+                                <TextBlock Name="BackendDetail" Classes="hint"/>
+
+                                <TextBlock Name="RecordElapsedText" Text="00:00" FontSize="30"
+                                           FontWeight="Bold" Foreground="{DynamicResource Accent}"
+                                           Margin="0,10,0,0"/>
+
+                                <TextBlock Text="CAPTURE" Foreground="{DynamicResource TextMuted}"
+                                           FontSize="10" FontWeight="Bold" Margin="0,18,0,0"/>
+                                <TextBlock Text="Which screen goes into the clip. Instant replay follows the same choice."
+                                           Classes="hint"/>
+
+                                <!-- Filled at runtime: how many screens exist is
+                                     not knowable until the app is running. -->
+                                <WrapPanel Name="DisplayPanel" Margin="0,10,0,0"/>
+                                <TextBlock Name="ScreenNote" Classes="hint"/>
+
+                                <TextBlock Text="FRAMERATE" Foreground="{DynamicResource TextMuted}"
+                                           FontSize="10" FontWeight="Bold" Margin="0,18,0,0"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                    <RadioButton Name="Fps30" GroupName="Fps" Classes="segment" Content="30"/>
+                                    <RadioButton Name="Fps60" GroupName="Fps" Classes="segment" Content="60"
+                                                 IsChecked="True"/>
+                                    <RadioButton Name="Fps120" GroupName="Fps" Classes="segment" Content="120"/>
+                                    <RadioButton Name="Fps144" GroupName="Fps" Classes="segment" Content="144"
+                                                 Margin="0"/>
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <Button Name="RecordButton" Content="Start recording" Classes="accent"
+                                            Height="36" Width="164" Margin="0,0,10,0"
+                                            HorizontalContentAlignment="Center"
+                                            VerticalContentAlignment="Center"/>
+                                    <Button Name="RecordHotkeyButton" Content="Not set"
+                                            ToolTip.Tip="Click, then press a key"
+                                            Height="36" Padding="16,0" MinWidth="64" Margin="0,0,10,0"
+                                            HorizontalContentAlignment="Center"
+                                            VerticalContentAlignment="Center"/>
+                                    <Button Name="RescanButton" Content="Rescan screens"
+                                            Height="36" Padding="16,0" Margin="0,0,10,0"
+                                            VerticalContentAlignment="Center"/>
+                                    <Button Name="OpenClipsButton" Content="Open clips folder"
+                                            Height="36" Padding="16,0" Margin="0"
+                                            VerticalContentAlignment="Center"/>
+                                </StackPanel>
+
+                                <TextBlock Name="RecordStatus" Classes="hint" Margin="0,10,0,0"/>
+                                <TextBlock Name="RecordError" Classes="hint" IsVisible="False"
+                                           Foreground="{DynamicResource Accent}" Margin="0,10,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card">
+                            <StackPanel>
+                                <DockPanel LastChildFill="False">
+                                    <TextBlock Text="INSTANT REPLAY" Foreground="{DynamicResource TextMuted}"
+                                               FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <CheckBox Name="ReplayEnabled" DockPanel.Dock="Right" Margin="0"
+                                              VerticalAlignment="Center"/>
+                                </DockPanel>
+
+                                <TextBlock Text="Keeps the last minute rolling in the background. Press the hotkey and it saves what already happened."
+                                           Classes="hint"/>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <RadioButton Name="Replay15" GroupName="ReplayLength" Classes="segment"
+                                                 Content="15s"/>
+                                    <RadioButton Name="Replay30" GroupName="ReplayLength" Classes="segment"
+                                                 Content="30s" IsChecked="True"/>
+                                    <RadioButton Name="Replay60" GroupName="ReplayLength" Classes="segment"
+                                                 Content="60s" Margin="0"/>
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <Button Name="SaveReplayButton" Content="Save now" Classes="accent"
+                                            Height="36" Width="120" Margin="0,0,10,0"
+                                            HorizontalContentAlignment="Center"
+                                            VerticalContentAlignment="Center"/>
+                                    <Button Name="ReplayHotkeyButton" Content="Not set"
+                                            ToolTip.Tip="Click, then press a key"
+                                            Height="36" Padding="16,0" MinWidth="64" Margin="0"
+                                            HorizontalContentAlignment="Center"
+                                            VerticalContentAlignment="Center"/>
+                                </StackPanel>
+
+                                <TextBlock Name="ReplayStatusText" Classes="hint" Margin="0,10,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card">
+                            <StackPanel>
+                                <TextBlock Text="SHARE A CLIP" Foreground="{DynamicResource TextMuted}"
+                                           FontSize="10" FontWeight="Bold"/>
+                                <TextBlock Text="Pick a clip and get a link back, instead of handing someone a file."
+                                           Classes="hint"/>
+
+                                <Border BorderBrush="{DynamicResource Accent}" BorderThickness="1"
+                                        CornerRadius="8" Padding="12" Margin="0,14,0,0">
+                                    <TextBlock TextWrapping="Wrap" FontSize="11"
+                                               Foreground="{DynamicResource Text}"
+                                               Text="Uploading publishes the clip. Anyone with the link can watch it, there is no reliable way to delete it afterwards, and a screen recording captures whatever else was on screen at the time."/>
+                                </Border>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <Button Name="ChooseClipButton" Content="Choose a clip…"
+                                            Height="36" Padding="16,0" Margin="0,0,10,0"
+                                            VerticalContentAlignment="Center"/>
+                                    <Button Name="UploadClipButton" Content="Upload and get link"
+                                            Classes="accent" IsEnabled="False"
+                                            Height="36" Width="176" Margin="0"
+                                            HorizontalContentAlignment="Center"
+                                            VerticalContentAlignment="Center"/>
+                                </StackPanel>
+
+                                <TextBlock Name="ChosenClipText" Text="No clip chosen"
+                                           Classes="hint" Margin="0,12,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card">
+                            <StackPanel>
+                                <TextBlock Text="LINK" Foreground="{DynamicResource TextMuted}"
+                                           FontSize="10" FontWeight="Bold"/>
+
+                                <DockPanel LastChildFill="False" Margin="0,10,0,0">
+                                    <Button Name="CopyLinkButton" Content="Copy" DockPanel.Dock="Right"
+                                            IsEnabled="False" Padding="16,6" Margin="10,0,0,0"/>
+                                    <TextBox Name="ClipUrlBox" IsReadOnly="True" Width="440"
+                                             HorizontalAlignment="Left"/>
+                                </DockPanel>
+
+                                <TextBlock Name="UploadStatusText" Classes="hint" Margin="0,10,0,0"/>
+                                <TextBlock Name="ClipFolderText" Classes="hint" Margin="0,10,0,0"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- History -->
+                    <StackPanel Name="PageHistory" IsVisible="False">
+                        <Grid ColumnDefinitions="*,12,*,12,*,12,*" Margin="0,0,0,14">
+                            <Border Grid.Column="0" Classes="tile">
+                                <StackPanel>
+                                    <TextBlock Text="TIME" Classes="tiny"/>
+                                    <TextBlock Name="TotalTimeText" Text="0s" Classes="value" Margin="0,6,0,0"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="2" Classes="tile">
+                                <StackPanel>
+                                    <TextBlock Text="CLICKS" Classes="tiny"/>
+                                    <TextBlock Name="TotalClicksText" Text="0" Classes="value" Margin="0,6,0,0"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="4" Classes="tile">
+                                <StackPanel>
+                                    <TextBlock Text="AVERAGE" Classes="tiny"/>
+                                    <TextBlock Name="AverageRateText" Text="—" Classes="value" Margin="0,6,0,0"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="6" Classes="tile">
+                                <StackPanel>
+                                    <TextBlock Text="DAYS" Classes="tiny"/>
+                                    <TextBlock Name="DaysText" Text="0" Classes="value" Margin="0,6,0,0"/>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <Border Classes="card">
+                            <StackPanel>
+                                <DockPanel LastChildFill="False" Margin="0,0,0,12">
+                                    <TextBlock Text="BY DAY" Classes="label" VerticalAlignment="Center"/>
+                                    <Button Name="ResetHistoryButton" DockPanel.Dock="Right"
+                                            Content="Reset" Padding="14,6" FontSize="11"/>
+                                </DockPanel>
+                                <TextBlock Name="NoHistoryText" Classes="hint"
+                                           Text="Nothing yet. Start the clicker and this fills in."/>
+                                <ItemsControl Name="HistoryList"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- Theme -->
+                    <StackPanel Name="PageTheme" IsVisible="False">
+
+                        <Border Classes="card">
+                            <StackPanel>
+                                <TextBlock Text="MODE" Foreground="{DynamicResource TextMuted}"
+                                           FontSize="10" FontWeight="Bold"/>
+                                <TextBlock Text="Swaps the backgrounds, text and controls. The accent is unaffected — it stays whichever colour is chosen below."
+                                           Classes="hint"/>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <RadioButton Name="ThemeDark" GroupName="ThemeMode" Classes="segment"
+                                                 Content="Dark" IsChecked="True" MinWidth="100"/>
+                                    <RadioButton Name="ThemeLight" GroupName="ThemeMode" Classes="segment"
+                                                 Content="Light" MinWidth="100" Margin="0"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card">
+                            <StackPanel>
+                                <DockPanel LastChildFill="False">
+                                    <TextBlock Text="ACCENT COLOUR" Foreground="{DynamicResource TextMuted}"
+                                               FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <TextBlock Name="AccentNameText" DockPanel.Dock="Right" Text="Crimson"
+                                               Foreground="{DynamicResource Accent}" FontSize="12"
+                                               FontWeight="Bold" VerticalAlignment="Center"/>
+                                </DockPanel>
+                                <TextBlock Text="Recolours the buttons, highlights and status marks. Backgrounds and text stay as they are."
+                                           Classes="hint"/>
+
+                                <WrapPanel Name="SwatchPanel" Margin="0,14,0,0"
+                                           MaxWidth="340" HorizontalAlignment="Left"/>
+
+                                <DockPanel LastChildFill="True" Margin="0,10,0,0">
+                                    <Button Name="CustomAccentButton" DockPanel.Dock="Right"
+                                            Content="Use it" Padding="16,6" Margin="10,0,0,0"/>
+                                    <TextBox Name="CustomAccentBox" Watermark="#RRGGBB" MaxLength="7"
+                                             Width="140" HorizontalAlignment="Left"/>
+                                </DockPanel>
+                                <TextBlock Name="AccentError" Classes="hint" IsVisible="False"
+                                           Foreground="{DynamicResource Accent}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card">
+                            <StackPanel>
+                                <DockPanel LastChildFill="False">
+                                    <TextBlock Text="WINDOW OPACITY" Foreground="{DynamicResource TextMuted}"
+                                               FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <TextBlock Name="OpacityValueText" DockPanel.Dock="Right" Text="100%"
+                                               Foreground="{DynamicResource TextMuted}" FontSize="11"
+                                               VerticalAlignment="Center"/>
+                                </DockPanel>
+                                <TextBlock Text="Fades the whole window so whatever is behind it stays readable. Stops well short of invisible, so it can always be found again."
+                                           Classes="hint"/>
+
+                                <Slider Name="OpacitySlider" Minimum="0.4" Maximum="1" Value="1"
+                                        Margin="0,10,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card">
+                            <StackPanel>
+                                <TextBlock Text="PREVIEW" Foreground="{DynamicResource TextMuted}"
+                                           FontSize="10" FontWeight="Bold"/>
+                                <TextBlock Text="The same pieces the rest of the app is built from, so a colour can be judged before it is lived with."
+                                           Classes="hint"/>
+
+                                <Border Background="{DynamicResource Sunken}" CornerRadius="10"
+                                        Padding="16" Margin="0,14,0,0">
+                                    <StackPanel>
+                                        <DockPanel LastChildFill="False">
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Ellipse Width="8" Height="8" Margin="0,0,8,0"
+                                                         VerticalAlignment="Center"
+                                                         Fill="{DynamicResource Accent}"/>
+                                                <TextBlock Text="RUNNING" FontWeight="Bold"
+                                                           VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                            <Button DockPanel.Dock="Right" Classes="accent" Content="Start"
+                                                    Width="100" Height="34"
+                                                    HorizontalContentAlignment="Center"
+                                                    VerticalContentAlignment="Center"/>
+                                        </DockPanel>
+
+                                        <Slider Minimum="0" Maximum="100" Value="64" Margin="0,14,0,0"/>
+
+                                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                            <TextBlock Text="85.86" Classes="value" Margin="0,0,10,0"/>
+                                            <TextBlock Text="CPS" Classes="hint" Margin="0,6,0,0"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- Settings -->
+                    <StackPanel Name="PageSettings" IsVisible="False">
+
+                        <Border Classes="card">
+                            <StackPanel>
+                                <DockPanel LastChildFill="False">
+                                    <TextBlock Text="HOTKEYS" Foreground="{DynamicResource TextMuted}"
+                                               FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <CheckBox Name="HotkeysEnabled" DockPanel.Dock="Right" Margin="0"
+                                              IsChecked="True" VerticalAlignment="Center"/>
+                                </DockPanel>
+
+                                <TextBlock Text="Hotkeys are watched system-wide, so they fire inside a game — and just as readily while you are typing in a browser or a chat box. Turning this off silences all five without unbinding them."
+                                           Classes="hint"/>
+
+                                <TextBlock Name="HotkeySummaryText" Foreground="{DynamicResource TextDim}"
+                                           FontSize="11" TextWrapping="Wrap" Margin="0,10,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card" Name="PermissionsCard">
+                            <StackPanel>
+                                <DockPanel LastChildFill="False">
+                                    <TextBlock Text="PERMISSIONS" Foreground="{DynamicResource TextMuted}"
+                                               FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <Button Name="RecheckPermissionsButton" DockPanel.Dock="Right"
+                                            Content="Re-check" Padding="14,6" FontSize="11"/>
+                                </DockPanel>
+
+                                <TextBlock Text="macOS refuses both of these silently — clicks vanish and recordings come out black — so they are checked here rather than guessed at."
+                                           Classes="hint"/>
+
+                                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto"
+                                      Margin="0,14,0,0">
+                                    <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,12,10">
+                                        <TextBlock Text="Accessibility" FontWeight="SemiBold"/>
+                                        <TextBlock Name="AccessibilityDetail" Classes="hint"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Row="0" Grid.Column="1" Name="AccessibilityState"
+                                               FontWeight="Bold" FontSize="11" VerticalAlignment="Center"/>
+
+                                    <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,12,0">
+                                        <TextBlock Text="Screen Recording" FontWeight="SemiBold"/>
+                                        <TextBlock Name="ScreenRecordingDetail" Classes="hint"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal"
+                                                VerticalAlignment="Center">
+                                        <Button Name="AskScreenButton" Content="Ask" Padding="12,4"
+                                                FontSize="11" Margin="0,0,10,0" IsVisible="False"/>
+                                        <TextBlock Name="ScreenRecordingState" FontWeight="Bold"
+                                                   FontSize="11" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card">
+                            <StackPanel>
+                                <TextBlock Text="CLIP FOLDER" Foreground="{DynamicResource TextMuted}"
+                                           FontSize="10" FontWeight="Bold"/>
+                                <TextBlock Name="ClipFolderHint" Classes="hint"
+                                           Text="Where recordings and saved replays are written."/>
+
+                                <DockPanel Margin="0,10,0,0" LastChildFill="True">
+                                    <Button Name="ResetClipFolderButton" DockPanel.Dock="Right"
+                                            Content="Default" Height="36" Padding="16,0" Margin="10,0,0,0"
+                                            VerticalContentAlignment="Center"/>
+                                    <Button Name="BrowseClipFolderButton" DockPanel.Dock="Right"
+                                            Content="Browse…" Height="36" Padding="16,0" Margin="10,0,0,0"
+                                            VerticalContentAlignment="Center"/>
+                                    <TextBox Name="ClipFolderBox" Height="36"
+                                             VerticalContentAlignment="Center"/>
+                                </DockPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card">
+                            <StackPanel>
+                                <DockPanel LastChildFill="False">
+                                    <TextBlock Text="ROBLOX CACHE" Foreground="{DynamicResource TextMuted}"
+                                               FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                        <Button Name="MeasureCacheButton" Content="Measure"
+                                                Padding="14,6" FontSize="11" Margin="0,0,10,0"/>
+                                        <Button Name="ClearCacheButton" Content="Clear"
+                                                Padding="14,6" FontSize="11"/>
+                                    </StackPanel>
+                                </DockPanel>
+
+                                <TextBlock Text="Roblox never prunes its own caches, logs or crash reports. Clearing them costs one slower launch while the cache refills, and touches nothing you would have to set up again."
+                                           Classes="hint"/>
+
+                                <ItemsControl Name="CacheList" Margin="0,12,0,0"/>
+
+                                <TextBlock Name="CacheTotalText" Foreground="{DynamicResource TextDim}"
+                                           FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card">
+                            <StackPanel>
+                                <DockPanel LastChildFill="False">
+                                    <TextBlock Text="MENU BAR" Foreground="{DynamicResource TextMuted}"
+                                               FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <CheckBox Name="MenuBarEnabled" DockPanel.Dock="Right" Margin="0"
+                                              IsChecked="True" VerticalAlignment="Center"/>
+                                </DockPanel>
+
+                                <TextBlock Name="MenuBarHint" Classes="hint"
+                                           Text="Puts a dot in the menu bar that starts and stops the clicker, so the window does not have to be in front of the game."/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card">
+                            <StackPanel>
+                                <TextBlock Text="INPUT ENGINE" Foreground="{DynamicResource TextMuted}"
+                                           FontSize="10" FontWeight="Bold"/>
+                                <TextBlock Name="EngineDetail" Classes="hint"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card">
+                            <StackPanel>
+                                <DockPanel LastChildFill="False">
+                                    <TextBlock Text="STORED DATA" Foreground="{DynamicResource TextMuted}"
+                                               FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <Button Name="OpenSettingsFolderButton" DockPanel.Dock="Right"
+                                            Content="Open folder" Padding="14,6" FontSize="11"/>
+                                </DockPanel>
+
+                                <TextBlock Name="SettingsPathText" Classes="hint"/>
+                                <TextBlock Name="StoredFilesText" Foreground="{DynamicResource TextDim}"
+                                           FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"/>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <Button Name="ResetSettingsButton" Content="Reset settings"
+                                            Padding="14,6" FontSize="11" Margin="0,0,10,0"/>
+                                    <Button Name="ConfirmResetButton" Content="Confirm reset"
+                                            Classes="accent" Padding="14,6" FontSize="11"
+                                            IsVisible="False"/>
+                                </StackPanel>
+
+                                <TextBlock Name="ResetHint" Classes="hint" IsVisible="False"
+                                           Foreground="{DynamicResource Accent}"
+                                           Text="This clears rates, hotkeys, presets, theme and click history. Clips on disk are untouched."/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card">
+                            <StackPanel>
+                                <TextBlock Text="ABOUT" Foreground="{DynamicResource TextMuted}"
+                                           FontSize="10" FontWeight="Bold"/>
+                                <TextBlock Name="AboutText" Classes="hint"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                </Panel>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</Window>
