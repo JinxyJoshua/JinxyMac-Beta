@@ -74,21 +74,36 @@ Packaging/  Bundle assembly, Info.plist, icon generator
 Tests sit next to the code they cover and are compiled by
 `Testing/JinxyMac.Tests.csproj`, which links them in by source.
 
-## What is not tested
+## What has been run on a Mac
 
-Five files have never run:
+Five files shipped in 1.0.0 having never been executed. Three of them now have.
 
-| | Why it matters |
+| | State |
 |---|---|
-| `Engine/MacClickEngine.cs` | CGEvent. macOS discards synthetic input **silently** without Accessibility permission. |
-| `Engine/MacHotkeyWatcher.cs` | `CGEventSourceKeyState` and the key code table. |
-| `Engine/MacPermissions.cs` | The permission checks themselves. |
-| `Core/SystemLoad.cs` | Raw Mach struct layouts. Two real bugs were found here by reading — a short buffer the kernel would overrun, and a leaked port right per tick. |
-| `Capture/` avfoundation path | Argument shape is tested; capture against a real screen is not. |
+| `Engine/MacClickEngine.cs` | **Works.** Clicks register in Roblox as of 1.0.4. |
+| `Engine/MacHotkeyWatcher.cs` | **Works.** Including Mouse 4 and Mouse 5 as bindings. |
+| `Engine/MacPermissions.cs` | **Works.** Correctly reported both permissions missing. |
+| `Core/SystemLoad.cs` | Never run. Raw Mach struct layouts. |
+| `Capture/` avfoundation path | Never run against a real screen. |
+| `Core/Updater.cs` | Never run. The bundle swap in particular. |
 
-The recorder retries without `-framerate` if a screen rejects the requested
-rate, and keeps ffmpeg's stderr so a failure says *why* rather than that there
-was one. Both exist because the failure could not be reproduced before release.
+Two bugs were found in the click path by testing, and both were the kind
+nothing local would have caught:
+
+- Events carried no `kCGMouseEventClickState`. A mouse-down with click state
+  zero is not part of a click sequence; AppKit forwards it to a button anyway,
+  so it worked everywhere *except* an application reading events itself. A game
+  is exactly that.
+- Every synthetic event suppressed real input for 250ms — the default local
+  events suppression interval on an event source. At 20 CPS a post lands every
+  50ms, so the window never closed and macOS stopped seeing the keyboard,
+  including the hotkey meant to stop the clicker.
+
+Two more were found in `SystemLoad.cs` by reading rather than running: a short
+buffer the kernel would have overrun, and a leaked Mach port right per tick.
+
+Every Mac bug so far has been in these files. None has come from the tested
+core, which is the seam earning its keep.
 
 ## Relationship to the Windows app
 
