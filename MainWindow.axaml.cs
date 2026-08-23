@@ -574,31 +574,31 @@ public partial class MainWindow : Window
         _hotkeys.Pressed += code => Dispatcher.UIThread.Post(() => Fire(code));
         _hotkeys.Released += code => Dispatcher.UIThread.Post(() => Lifted(code));
 
-        Bind(HotkeyButton, (code, name) =>
+        Bind(HotkeyButton, "clicker", (code, name) =>
         {
             _settings.HotkeyCode = code;
             _settings.HotkeyName = name;
         });
 
-        Bind(ComboHotkeyButton, (code, name) =>
+        Bind(ComboHotkeyButton, "clicker + shake", (code, name) =>
         {
             _settings.ComboCode = code;
             _settings.ComboName = name;
         });
 
-        Bind(BuildHotkeyButton, (code, name) =>
+        Bind(BuildHotkeyButton, "building", (code, name) =>
         {
             _settings.BuildCode = code;
             _settings.BuildName = name;
         });
 
-        Bind(RecordHotkeyButton, (code, name) =>
+        Bind(RecordHotkeyButton, "record", (code, name) =>
         {
             _settings.RecordCode = code;
             _settings.RecordName = name;
         });
 
-        Bind(ReplayHotkeyButton, (code, name) =>
+        Bind(ReplayHotkeyButton, "save replay", (code, name) =>
         {
             _settings.ReplayCode = code;
             _settings.ReplayName = name;
@@ -665,18 +665,39 @@ public partial class MainWindow : Window
     /// register as a fresh press the instant the binding took effect and start
     /// the clicker before the user let go.
     /// </remarks>
-    private void Bind(Button button, Action<int, string> store)
+    private void Bind(Button button, string action, Action<int, string> store)
     {
         button.Click += (_, _) =>
         {
             if (_rebinding) return;
 
             _rebinding = true;
+
+            object? previous = button.Content;
             button.Content = "Press a key…";
+
+            HotkeyNoticeText.IsVisible = false;
 
             _hotkeys.CaptureNext((code, name) => Dispatcher.UIThread.Post(() =>
             {
                 _rebinding = false;
+
+                // One key, one action. Bound twice, only the first would ever
+                // run — which reads as a hotkey that quietly stopped working
+                // rather than as a clash, so it is refused by name instead.
+                string? taken = Bindings()
+                    .Where(b => b.Code == code && b.Action != action)
+                    .Select(b => b.Action)
+                    .FirstOrDefault();
+
+                if (taken != null)
+                {
+                    button.Content = previous;
+
+                    HotkeyNoticeText.Text = $"{name} is already the {taken} key. Pick another.";
+                    HotkeyNoticeText.IsVisible = true;
+                    return;
+                }
 
                 store(code, name);
                 button.Content = name;
@@ -684,9 +705,25 @@ public partial class MainWindow : Window
                 _settings.Save();
                 ArmHotkeys();
             }));
-
         };
     }
+
+    /// <summary>
+    /// Every binding, with the action it belongs to.
+    /// </summary>
+    /// <remarks>
+    /// One list, read by both the clash check and the summary on the Settings
+    /// page. Kept apart they would disagree the first time a sixth action was
+    /// added and only one of them updated.
+    /// </remarks>
+    private (string Action, int Code, string Name)[] Bindings() => new[]
+    {
+        ("clicker", _settings.HotkeyCode, _settings.HotkeyName),
+        ("clicker + shake", _settings.ComboCode, _settings.ComboName),
+        ("building", _settings.BuildCode, _settings.BuildName),
+        ("record", _settings.RecordCode, _settings.RecordName),
+        ("save replay", _settings.ReplayCode, _settings.ReplayName)
+    };
 
     /// <summary>
     /// Tells the watcher which keys to look for, or none at all.
@@ -1233,6 +1270,15 @@ public partial class MainWindow : Window
         Length(Replay60, 60);
 
         ReplayEnabled.IsCheckedChanged += (_, _) => RefreshReplay();
+
+        RecheckFfmpegButton.Click += async (_, _) => await RescanScreens();
+
+        CopyFfmpegButton.Click += async (_, _) =>
+        {
+            if (Clipboard != null) await Clipboard.SetTextAsync(Ffmpeg.InstallHint);
+
+            CopyFfmpegButton.Content = "Copied";
+        };
         SaveReplayButton.Click += async (_, _) => await SaveReplay();
 
         ChooseClipButton.Click += async (_, _) => await ChooseClip();
@@ -1302,13 +1348,23 @@ public partial class MainWindow : Window
         {
             ScreenNote.Text = $"ffmpeg was not found. Install it with:  {Ffmpeg.InstallHint}";
             BackendDetail.Text = "No encoder — ffmpeg is missing.";
-            RecordButton.IsEnabled = false;
-            ReplayEnabled.IsEnabled = false;
+
+            // Left clickable on purpose. Greying these out meant the tester met
+            // a checkbox that would not tick and said nothing about why — the
+            // reason was on a different card, and a control that refuses to be
+            // touched teaches nothing. Pressed now, each one fails with the
+            // command that fixes it.
+            ReplayNoteText.Text = $"Needs ffmpeg, which is not installed. {Ffmpeg.InstallHint}";
+            ReplayNoteText.IsVisible = true;
+
+            FfmpegCommandText.Text = Ffmpeg.InstallHint;
+            FfmpegBanner.IsVisible = true;
+
             return;
         }
 
-        RecordButton.IsEnabled = true;
-        ReplayEnabled.IsEnabled = true;
+        ReplayNoteText.IsVisible = false;
+        FfmpegBanner.IsVisible = false;
         ScreenNote.Text = "Looking…";
 
         (List<CaptureDevice> found, string encoder) = await Task.Run(() =>
@@ -2284,18 +2340,9 @@ public partial class MainWindow : Window
     /// </summary>
     private void RefreshHotkeySummary()
     {
-        (string Label, int Code, string Name)[] bindings =
-        {
-            ("Clicker", _settings.HotkeyCode, _settings.HotkeyName),
-            ("Clicker + shake", _settings.ComboCode, _settings.ComboName),
-            ("Building", _settings.BuildCode, _settings.BuildName),
-            ("Record", _settings.RecordCode, _settings.RecordName),
-            ("Save replay", _settings.ReplayCode, _settings.ReplayName)
-        };
-
-        string[] bound = bindings
+        string[] bound = Bindings()
             .Where(b => b.Code != 0)
-            .Select(b => $"{b.Label}: {b.Name}")
+            .Select(b => $"{b.Action}: {b.Name}")
             .ToArray();
 
         HotkeySummaryText.Text = bound.Length == 0

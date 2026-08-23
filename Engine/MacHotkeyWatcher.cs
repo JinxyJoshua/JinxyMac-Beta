@@ -44,8 +44,31 @@ public sealed class MacHotkeyWatcher : IHotkeyWatcher
 
     public event Action<int>? Released;
 
+    /// <summary>
+    /// Mouse buttons live above this, as MouseBase plus the button number.
+    /// </summary>
+    /// <remarks>
+    /// Keyboard and mouse are two different questions on macOS —
+    /// CGEventSourceKeyState answers one and CGEventSourceButtonState the other
+    /// — but a binding is one number either way. Key codes stop at 127, so
+    /// putting the buttons at a thousand keeps them in the same int without a
+    /// second field to keep in step.
+    /// </remarks>
+    public const int MouseBase = 1000;
+
     public void Watch(IEnumerable<int> codes) =>
-        _watched = codes.Where(c => c is > 0 and < 128).Distinct().ToArray();
+        _watched = codes.Where(Bindable).Distinct().ToArray();
+
+    private static bool Bindable(int code) =>
+        code is > 0 and < 128 || IsMouse(code);
+
+    private static bool IsMouse(int code) => code >= MouseBase;
+
+    /// <summary>Whether a key or button is down right now, whichever it is.</summary>
+    private static bool Held(int code) =>
+        IsMouse(code)
+            ? CGEventSourceButtonState(HidSystemState, (uint)(code - MouseBase))
+            : CGEventSourceKeyState(HidSystemState, (ushort)code);
 
     public void CaptureNext(Action<int, string> captured) => _capture = captured;
 
@@ -71,7 +94,14 @@ public sealed class MacHotkeyWatcher : IHotkeyWatcher
 
     private void Poll(CancellationToken token)
     {
-        var down = new bool[128];
+        // Sized for the mouse codes as well as the keys, so one array indexes
+        // both without a second lookup.
+        var down = new bool[MouseBase + 8];
+
+        // The side buttons only. Left is the button this app is busy
+        // synthesising and binding it would be a loop; right and middle are
+        // wanted in the game.
+        int[] buttons = { MouseBase + 3, MouseBase + 4 };
 
         while (!token.IsCancellationRequested)
         {
@@ -79,11 +109,15 @@ public sealed class MacHotkeyWatcher : IHotkeyWatcher
             {
                 if (_capture is { } capture)
                 {
-                    // Rebinding. Any key ends it, and it must not also fire the
-                    // action it was in the middle of binding.
-                    for (ushort code = 0; code < down.Length; code++)
+                    // Rebinding. Any key or side button ends it, and it must not
+                    // also fire the action it was in the middle of binding.
+                    var candidates = new List<int>(128 + buttons.Length);
+                    for (int code = 0; code < 128; code++) candidates.Add(code);
+                    candidates.AddRange(buttons);
+
+                    foreach (int code in candidates)
                     {
-                        bool held = CGEventSourceKeyState(HidSystemState, code);
+                        bool held = Held(code);
 
                         if (held && !down[code])
                         {
@@ -105,15 +139,14 @@ public sealed class MacHotkeyWatcher : IHotkeyWatcher
                 }
                 else
                 {
-                    foreach (int watched in _watched)
+                    foreach (int code in _watched)
                     {
-                        ushort code = (ushort)watched;
-                        bool held = CGEventSourceKeyState(HidSystemState, code);
+                        bool held = Held(code);
 
                         // Edge only, both ways: holding must not retrigger for
                         // ever, and hold mode needs the moment it comes back up.
-                        if (held && !down[code]) Pressed?.Invoke(watched);
-                        else if (!held && down[code]) Released?.Invoke(watched);
+                        if (held && !down[code]) Pressed?.Invoke(code);
+                        else if (!held && down[code]) Released?.Invoke(code);
 
                         down[code] = held;
                     }
@@ -135,8 +168,11 @@ public sealed class MacHotkeyWatcher : IHotkeyWatcher
     /// Only the keys someone would plausibly bind. Anything else shows its code,
     /// which is ugly but honest and still identifies the key uniquely.
     /// </remarks>
-    private static string Name(ushort code) => code switch
+    private static string Name(int code) => code switch
     {
+        MouseBase + 3 => "Mouse 4",
+        MouseBase + 4 => "Mouse 5",
+
         0 => "A", 1 => "S", 2 => "D", 3 => "F", 4 => "H", 5 => "G",
         6 => "Z", 7 => "X", 8 => "C", 9 => "V", 11 => "B", 12 => "Q",
         13 => "W", 14 => "E", 15 => "R", 16 => "Y", 17 => "T",
@@ -161,6 +197,10 @@ public sealed class MacHotkeyWatcher : IHotkeyWatcher
     [DllImport(ApplicationServices)]
     [return: MarshalAs(UnmanagedType.I1)]
     private static extern bool CGEventSourceKeyState(uint stateId, ushort keyCode);
+
+    [DllImport(ApplicationServices)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    private static extern bool CGEventSourceButtonState(uint stateId, uint button);
 
     [DllImport(ApplicationServices)]
     [return: MarshalAs(UnmanagedType.I1)]

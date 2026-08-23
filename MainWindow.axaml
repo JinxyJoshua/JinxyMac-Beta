@@ -356,6 +356,9 @@
                                                 HorizontalContentAlignment="Center"
                                                 VerticalContentAlignment="Center"/>
                                     </DockPanel>
+
+                                    <TextBlock Name="HotkeyNoticeText" Classes="hint" IsVisible="False"
+                                               Foreground="{DynamicResource Accent}" Margin="0,12,0,0"/>
                                 </StackPanel>
                             </Border>
 
@@ -581,6 +584,34 @@
                     <!-- Recorder -->
                     <StackPanel Name="PageRecorder" IsVisible="False">
 
+                        <!-- Shown only when ffmpeg is missing, which takes this
+                             entire page down with it. Loud, because the page
+                             otherwise just looks broken. -->
+                        <Border Name="FfmpegBanner" IsVisible="False"
+                                Background="{DynamicResource Panel}"
+                                BorderBrush="{DynamicResource Accent}" BorderThickness="1"
+                                CornerRadius="12" Padding="18" Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="RECORDING NEEDS FFMPEG"
+                                           Foreground="{DynamicResource Accent}"
+                                           FontSize="10" FontWeight="Bold"/>
+                                <TextBlock Text="Nothing on this page works without it. Everything else in the app — clicking, hotkeys, presets, shake, history — is unaffected."
+                                           Classes="hint"/>
+                                <Border Background="{DynamicResource Sunken}" CornerRadius="8"
+                                        Padding="12" Margin="0,12,0,0">
+                                    <SelectableTextBlock Name="FfmpegCommandText"
+                                                         FontFamily="monospace" FontSize="13"
+                                                         Foreground="{DynamicResource Text}"/>
+                                </Border>
+                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                    <Button Name="CopyFfmpegButton" Content="Copy command"
+                                            Padding="14,6" FontSize="11" Margin="0,0,10,0"/>
+                                    <Button Name="RecheckFfmpegButton" Content="Check again"
+                                            Padding="14,6" FontSize="11"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
                         <Border Classes="card">
                             <StackPanel>
                                 <TextBlock Text="RECORD" Foreground="{DynamicResource TextMuted}"
@@ -647,6 +678,9 @@
 
                                 <TextBlock Text="Keeps the last minute rolling in the background. Press the hotkey and it saves what already happened."
                                            Classes="hint"/>
+
+                                <TextBlock Name="ReplayNoteText" Classes="hint" IsVisible="False"
+                                           Foreground="{DynamicResource Accent}"/>
 
                                 <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
                                     <RadioButton Name="Replay15" GroupName="ReplayLength" Classes="segment"
