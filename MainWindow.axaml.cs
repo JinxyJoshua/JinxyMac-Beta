@@ -1554,9 +1554,43 @@ public partial class MainWindow : Window
         return button;
     }
 
+    /// <summary>
+    /// Whether macOS will actually let a capture happen, said before trying.
+    /// </summary>
+    /// <remarks>
+    /// Checked here rather than left to ffmpeg. Without Screen Recording
+    /// permission avfoundation does not refuse — it hands back an I/O error or,
+    /// worse, black frames, and the message that reaches the page is ffmpeg
+    /// complaining about a device rather than macOS explaining a permission.
+    ///
+    /// Accessibility and Screen Recording are separate grants and people
+    /// reasonably assume the first covers the second, because both live on the
+    /// same page of System Settings.
+    /// </remarks>
+    private void WarnIfCaptureBlocked()
+    {
+        if (MacPermissions.ScreenRecording() != Permission.Denied) return;
+
+        RecordError.Text =
+            "Screen Recording permission looks missing, so the clip will probably come out black — "
+            + "macOS does not refuse the capture, it just hands over empty frames. "
+            + MacPermissions.Where("Screen Recording")
+            + "\n\nIt is a separate grant from Accessibility; one does not imply the other. "
+            + "If it is already on and clips are still black, add the ffmpeg binary itself: "
+            + "press + in that list, then Command-Shift-G and paste "
+            + (Ffmpeg.Find() ?? "/opt/homebrew/bin/ffmpeg")
+            + " — the capture is done by ffmpeg, not by Jinxy, and an unsigned app cannot always "
+            + "lend its permission to a program it launches.";
+
+        RecordError.IsVisible = true;
+    }
+
     private async Task ToggleRecording()
     {
         RecordError.IsVisible = false;
+
+        if (!_recorder.IsRecording) WarnIfCaptureBlocked();
+
         RecordButton.IsEnabled = false;
 
         try
@@ -1640,6 +1674,21 @@ public partial class MainWindow : Window
     private void RefreshReplay()
     {
         bool wanted = ReplayEnabled.IsChecked == true;
+
+        // Same permission, same silent failure — a buffer full of black frames
+        // is worse than one that never started, because it looks like it works
+        // until someone saves a clip.
+        if (wanted && !_replay.IsRunning && MacPermissions.ScreenRecording() == Permission.Denied)
+        {
+            ReplayStatusText.Text =
+                "Screen Recording permission is not granted. " + MacPermissions.Where("Screen Recording");
+
+            _loading = true;
+            ReplayEnabled.IsChecked = false;
+            _loading = false;
+
+            return;
+        }
 
         try
         {

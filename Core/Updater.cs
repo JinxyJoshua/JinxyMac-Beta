@@ -35,7 +35,7 @@ public static class Updater
     /// build-mac.sh reads this and writes it into Info.plist, so the number in
     /// the bundle cannot drift from the number the updater compares against.
     /// </remarks>
-    public const string Version = "1.0.5";
+    public const string Version = "1.0.6";
 
     private const string Feed =
         "https://api.github.com/repos/JinxyJoshua/JinxyMac-Beta/releases/latest";
