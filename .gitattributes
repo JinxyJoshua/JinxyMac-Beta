@@ -1,0 +1,15 @@
+# Shell scripts must keep unix line endings, whatever platform clones them.
+#
+# Without this, git on Windows checks them out with CRLF and the shebang line
+# becomes "#!/bin/sh\r". The kernel then looks for an interpreter literally
+# named "/bin/sh\r", fails, and reports a file-not-found for a path that
+# plainly exists. build-mac.sh strips the carriage returns when it assembles
+# the bundle, but a Mac cloning this repo runs the script directly.
+*.sh text eol=lf
+
+# Read by macOS, which does not want carriage returns in either.
+*.plist text eol=lf
+Packaging/README-mac.txt text eol=lf
+
+# Generated icon container. Not text, and must never be line-ending converted.
+*.icns binary
