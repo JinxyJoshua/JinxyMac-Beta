@@ -276,6 +276,34 @@
                     <!-- Clicker -->
                     <StackPanel Name="PageClicker">
 
+                        <!-- Shown when macOS is refusing to deliver the clicks.
+                             This is the failure that looks like a broken app:
+                             everything runs, the counter counts, and nothing
+                             reaches the game. It gets the whole story, not a
+                             word in a pill. -->
+                        <Border Name="PermissionBanner" IsVisible="False"
+                                Background="{DynamicResource Panel}"
+                                BorderBrush="{DynamicResource Accent}" BorderThickness="1"
+                                CornerRadius="12" Padding="18" Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="MACOS IS DISCARDING THE CLICKS"
+                                           Foreground="{DynamicResource Accent}"
+                                           FontSize="10" FontWeight="Bold"/>
+                                <TextBlock Name="PermissionReasonText" Classes="hint"/>
+
+                                <TextBlock Classes="hint" Margin="0,10,0,0"
+                                           Text="If Jinxy is already ticked in that list, untick it and tick it again — an updated app keeps the old entry, and the old entry no longer matches. Removing it with the minus button and adding this copy back is the surest fix."/>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <Button Name="OpenAccessibilityButton" Content="Open the setting"
+                                            Classes="accent" Padding="16,7" Margin="0,0,10,0"
+                                            VerticalContentAlignment="Center"/>
+                                    <Button Name="RecheckAccessButton" Content="Check again"
+                                            Padding="14,6" FontSize="11"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
                         <!-- Stats. Both tiles measure the whole machine, and say
                              so — read as the app's own they would look alarming. -->
                         <Grid ColumnDefinitions="*,14,*" Margin="0,0,0,14">

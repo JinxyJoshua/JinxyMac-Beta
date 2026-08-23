@@ -218,6 +218,39 @@ public partial class MainWindow : Window
         ToggleModeButton.IsCheckedChanged += (_, _) => ModeChanged();
 
         HideValuesButton.Click += (_, _) => HideValues(!_valuesHidden);
+
+        RecheckAccessButton.Click += (_, _) =>
+        {
+            RefreshPermissionBanner();
+            DescribePermissions();
+        };
+
+        OpenAccessibilityButton.Click += (_, _) =>
+            Open("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility");
+    }
+
+    /// <summary>
+    /// Shows or hides the banner explaining why nothing is being clicked.
+    /// </summary>
+    /// <remarks>
+    /// Driven off the engine rather than a stored flag, so it disappears the
+    /// moment the permission is granted rather than at the next restart.
+    ///
+    /// This is the failure worth the most words in the whole app. Everything
+    /// looks like it is working — the button says RUNNING, the counter counts,
+    /// the measured rate is right — and macOS is throwing every event away.
+    /// Someone who does not know the permission exists has no way to guess.
+    /// </remarks>
+    private void RefreshPermissionBanner()
+    {
+        bool blocked = !_engine.IsAvailable;
+
+        PermissionBanner.IsVisible = blocked;
+
+        if (!blocked) return;
+
+        PermissionReasonText.Text = _engine.Unavailable
+            ?? "Clicks are not reaching the system.";
     }
 
     /// <summary>
@@ -355,7 +388,11 @@ public partial class MainWindow : Window
         {
             if (!_engine.IsAvailable)
             {
-                StatusText.Text = "UNAVAILABLE";
+                // The pill is one word; the banner is the explanation, and
+                // this is the moment it is most wanted.
+                StatusText.Text = "BLOCKED";
+                RefreshPermissionBanner();
+                NavClicker.IsChecked = true;
                 return;
             }
 
@@ -462,6 +499,10 @@ public partial class MainWindow : Window
         RefreshRecording();
         RefreshTiles();
         RefreshTray();
+
+        // Re-checked every second, so granting the permission clears the banner
+        // without a restart and losing it puts the banner back.
+        RefreshPermissionBanner();
     }
 
     /// <summary>The two machine tiles at the top of the page.</summary>
@@ -803,7 +844,9 @@ public partial class MainWindow : Window
         {
             if (!_engine.IsAvailable)
             {
-                StatusText.Text = "UNAVAILABLE";
+                StatusText.Text = "BLOCKED";
+                RefreshPermissionBanner();
+                NavClicker.IsChecked = true;
                 return;
             }
 
