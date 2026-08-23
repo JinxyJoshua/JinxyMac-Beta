@@ -162,6 +162,22 @@ public static class CaptureBackend
     }
 
     /// <summary>
+    /// Output arguments that force a real-time, constant-rate file.
+    /// </summary>
+    /// <remarks>
+    /// The other half of the wall-clock fix. Honest timestamps alone give a
+    /// variable-rate file whose frames are correctly spaced but sparse; players
+    /// and every upload target handle that badly, and editing it is worse.
+    ///
+    /// CFR tells ffmpeg to hold the last frame until the next one arrives, so
+    /// a still screen produces a still video of the right length rather than a
+    /// short one. It costs nothing to encode — a duplicated frame compresses to
+    /// almost nothing.
+    /// </remarks>
+    public static string OutputArgs(int framesPerSecond) =>
+        $"-fps_mode cfr -r {framesPerSecond}";
+
+    /// <summary>
     /// Split from the platform check so the arguments can be tested anywhere.
     /// </summary>
     /// <remarks>
@@ -173,11 +189,27 @@ public static class CaptureBackend
     {
         string rate = withFramerate ? $"-framerate {framesPerSecond} " : "";
 
+        // Stamp frames with the clock, not with whatever the device claims.
+        //
+        // avfoundation screen capture does not hand over a steady stream — it
+        // emits a frame when the screen changes, and a still screen produces
+        // almost none. The requested framerate is a request, and ffmpeg
+        // otherwise believes it: capture a minute at sixty and hand it fifty
+        // frames, and it writes a file that says sixty frames per second and
+        // lasts one second. Every frame is there; the clip is just played a
+        // minute too fast.
+        //
+        // Wall-clock timestamps make the durations real, and CFR on the output
+        // fills the gaps so the result is a video rather than a slideshow with
+        // honest metadata.
+        string clock = "-use_wallclock_as_timestamps 1 ";
+
         // Index 1 rather than 0 when nothing is chosen: on a Mac with a camera
         // — which is most of them — 0 is the camera and 1 is the first screen.
         int index = screen?.Index ?? 1;
 
         return "-f avfoundation -capture_cursor 1 -capture_mouse_clicks 1 "
+               + clock
                + rate
                + $"-i \"{index}:none\"";
     }

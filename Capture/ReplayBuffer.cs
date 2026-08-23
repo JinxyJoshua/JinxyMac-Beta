@@ -58,7 +58,7 @@ public sealed class ReplayBuffer : IDisposable
         // which is why the hardware encoder is not optional here.
         string arguments =
             $"-y {CaptureBackend.InputArgs(screen, framesPerSecond)} "
-            + $"{CaptureBackend.EncoderArgs(ffmpeg)} -g {framesPerSecond} "
+            + $"{CaptureBackend.EncoderArgs(ffmpeg)} {CaptureBackend.OutputArgs(framesPerSecond)} -g {framesPerSecond} "
             + $"-f segment -segment_time {SegmentSeconds} -segment_format mpegts "
             + $"-segment_wrap {CapacitySeconds / SegmentSeconds + 1} -reset_timestamps 1 \"{pattern}\"";
 

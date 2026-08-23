@@ -107,6 +107,7 @@ public sealed class ScreenRecorder : IDisposable
         string arguments =
             $"-y {CaptureBackend.InputArgs(screen, framesPerSecond, withFramerate)} "
             + $"{CaptureBackend.EncoderArgs(ffmpeg)} "
+            + $"{CaptureBackend.OutputArgs(framesPerSecond)} "
             + $"-movflags +faststart \"{path}\"";
 
         var info = new ProcessStartInfo(ffmpeg, arguments)

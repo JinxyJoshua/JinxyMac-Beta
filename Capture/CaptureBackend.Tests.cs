@@ -119,6 +119,32 @@ public class CaptureBackendTests
     }
 
     /// <summary>
+    /// The fix for a minute of capture arriving as a one-second clip. Without
+    /// wall-clock stamps ffmpeg believes the requested rate, so fifty frames
+    /// gathered over a minute are written as a second of sixty-fps video.
+    /// </summary>
+    [Fact]
+    public void StampsFramesWithTheClock()
+    {
+        string args = CaptureBackend.MacInputArgs(new CaptureDevice(1, "Capture screen 0"), 60, withFramerate: true);
+
+        Assert.Contains("-use_wallclock_as_timestamps 1", args);
+    }
+
+    /// <summary>
+    /// The other half: honest timestamps alone give a sparse variable-rate file.
+    /// CFR holds the last frame so a still screen records at its real length.
+    /// </summary>
+    [Fact]
+    public void ForcesAConstantOutputRate()
+    {
+        string args = CaptureBackend.OutputArgs(60);
+
+        Assert.Contains("-fps_mode cfr", args);
+        Assert.Contains("-r 60", args);
+    }
+
+    /// <summary>
     /// Input options have to precede -i or ffmpeg applies them to the output,
     /// where they mean something else or nothing at all.
     /// </summary>
