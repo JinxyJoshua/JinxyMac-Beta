@@ -16,6 +16,8 @@
   <ItemGroup>
     <Compile Include="../Core/ClickTiming.cs" />
     <Compile Include="../Core/ClickTiming.Tests.cs" />
+    <Compile Include="../Core/ClickOutput.cs" />
+    <Compile Include="../Core/ClickOutput.Tests.cs" />
     <Compile Include="../Core/Presets.cs" />
     <Compile Include="../Core/Presets.Tests.cs" />
     <Compile Include="../Core/ClickHistory.cs" />
