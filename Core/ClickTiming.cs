@@ -34,6 +34,12 @@ public static class ClickTimings
     /// Kept separate from the values actually read so the defaults survive as
     /// facts: a remote config that goes missing, or arrives with nonsense in
     /// it, falls back to exactly the numbers this build was tested with.
+    ///
+    /// 15ms is measured, not chosen. It matches a profile observed working and
+    /// lifts the delivered ceiling to about 33 clicks a second. The earlier
+    /// 25 → 20 → 17 → 25 wandering was all model and no measurement; this
+    /// number has an implementation behind it, which is the reason to leave it
+    /// alone without new evidence.
     /// </remarks>
     public const double DefaultHitFixMinDownMs = 15.0;
     public const double DefaultHitFixMinUpMs = 15.0;
