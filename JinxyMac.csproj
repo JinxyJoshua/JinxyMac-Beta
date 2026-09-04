@@ -12,6 +12,30 @@
     <RootNamespace>JinxyMac</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <!--
+      The compiler records where it built, and that record ships. A release DLL
+      carried the full build path in its CodeView entry — the folder name and
+      the account name it was built under — readable in any hex editor by
+      anyone who downloaded the tarball.
+
+      PathMap rewrites those paths to a relative "." so nothing about this
+      machine travels with the binary. Deterministic builds make the rewrite
+      total: without it some paths are still recorded absolutely.
+    -->
+    <PathMap>$(MSBuildProjectDirectory)=.</PathMap>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+  <!--
+    Release ships no debug record at all. PathMap cleans the source paths, but
+    the reference to the .pdb itself is still an absolute path to a file the
+    user does not have — leaking the same two names to no benefit, since the
+    symbols are not shipped either. Debug builds keep theirs so local
+    debugging still works.
+  -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
   </PropertyGroup>
 
   <ItemGroup>
