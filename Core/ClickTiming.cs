@@ -28,31 +28,30 @@ public readonly record struct ClickTiming(double DownMs, double PeriodMs)
 public static class ClickTimings
 {
     /// <summary>
-    /// Shortest the button is held, and the shortest gap after it, while HitFix
-    /// is on. A frame and a half at 60 fps, so a read lands inside a press
-    /// wherever the frame boundary happens to fall.
+    /// The shipped values, and the ones used unless a config says otherwise.
     /// </summary>
     /// <remarks>
-    /// 25ms came from assuming a client samples input once a frame, so a press
-    /// had to span a frame boundary (16.7ms at 60fps) to be seen at all.
-    ///
-    /// That assumption was wrong. A low-level mouse hook was used to capture a
-    /// competing clicker that reliably lands one more hit per ten seconds in the
-    /// same arena: it holds the button for 15.6ms — under a frame — at 31.8
-    /// clicks per second, and its presses register. Roblox takes mouse events
-    /// off the Windows message queue, where a short press is queued and read
-    /// like any other, not sampled per frame.
-    ///
-    /// So the floors only ever need to keep press and gap from collapsing to
-    /// nothing, which is what actually broke things at a 99% duty cycle. 15ms
-    /// matches a profile measured working and lifts the ceiling to ~33/s.
-    ///
-    /// The earlier 25 → 20 → 17 → 25 wandering was all model, no measurement.
-    /// This number has an implementation behind it.
+    /// Kept separate from the values actually read so the defaults survive as
+    /// facts: a remote config that goes missing, or arrives with nonsense in
+    /// it, falls back to exactly the numbers this build was tested with.
     /// </remarks>
-    public const double HitFixMinDownMs = 15.0;
+    public const double DefaultHitFixMinDownMs = 15.0;
+    public const double DefaultHitFixMinUpMs = 15.0;
 
-    public const double HitFixMinUpMs = 15.0;
+    /// <summary>
+    /// What the timing actually uses.
+    /// </summary>
+    /// <remarks>
+    /// Properties rather than constants because these are exactly the kind of
+    /// number that turns out to be slightly wrong on hardware nobody could
+    /// test — which, on macOS, is all of it.
+    ///
+    /// Bounded at the point the config is read, never here — this only ever
+    /// sees a value the app already agreed to accept.
+    /// </remarks>
+    public static double HitFixMinDownMs => RemoteConfig.Current.HitFixMinDownMs;
+
+    public static double HitFixMinUpMs => RemoteConfig.Current.HitFixMinUpMs;
 
     /// <summary>
     /// Resolves the timing for a rate and duty cycle.
@@ -69,13 +68,16 @@ public static class ClickTimings
 
         if (hitFix)
         {
-            // A client reads input once a frame. At 60 fps that is every ~17ms,
-            // so a press shorter than a frame can begin and end between two
-            // reads and never be seen.
+            // The floors only ever need to keep the press and the gap from
+            // collapsing to nothing, which is what actually broke at a 99% duty
+            // cycle.
             //
-            // Both edges need a read inside them, so the gap after the press
-            // gets a floor too. A press with no observed release is a held
-            // button, not a click.
+            // Not because a client samples input once a frame — that model was
+            // disproved. A competing clicker holds for 15.6ms, under a frame at
+            // 60fps, and its presses register; this app's own measured profile
+            // has a gap of a third of a frame and wins anyway. Roblox takes
+            // mouse events off the message queue, where a short press is queued
+            // and read like any other.
             downMs = Math.Max(downMs, HitFixMinDownMs);
 
             // Raising the period is what makes the floors reachable, and it

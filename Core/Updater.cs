@@ -37,8 +37,19 @@ public static class Updater
     /// </remarks>
     public const string Version = "1.0.8";
 
+    /// <summary>
+    /// The repository this build updates from, and reads its config from.
+    /// </summary>
+    /// <remarks>
+    /// Named once. Two places spelling out the same repository is two places
+    /// to get it wrong, and the failure is silent — an updater pointed at the
+    /// wrong repo simply never finds a release.
+    /// </remarks>
+    public const string Owner = "JinxyJoshua";
+    public const string Repo = "JinxyMac-Beta";
+
     private const string Feed =
-        "https://api.github.com/repos/JinxyJoshua/JinxyMac-Beta/releases/latest";
+        $"https://api.github.com/repos/{Owner}/{Repo}/releases/latest";
 
     private static readonly HttpClient Client = CreateClient();
 

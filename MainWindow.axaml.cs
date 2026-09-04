@@ -126,6 +126,11 @@ public partial class MainWindow : Window
         _ = StartCapture();
         RefreshMenuBar();
 
+        // Config first, so anything it turns off is off before the update
+        // prompt or any feature has had a chance to run. Fire and forget: the
+        // shipped defaults are already in force, and nothing waits on this.
+        _ = RemoteConfig.LoadAsync(CancellationToken.None);
+
         // Quietly, and only if asked for. Nothing is downloaded without a press.
         if (_settings.AutoCheckUpdates) _ = CheckForUpdate(announce: false);
 

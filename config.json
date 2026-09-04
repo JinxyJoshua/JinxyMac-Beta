@@ -1,0 +1,15 @@
+{
+  "_comment": "Live settings for JinxyMac. Edit this file on GitHub and every copy of the app picks it up next time it opens - no release, nobody re-downloading. That matters more here than on Windows: this app is unsigned, so installing an update costs the user their Accessibility grant. It can only change numbers and turn features off; it cannot change how the app works. Anything missing, misspelled or out of range falls back to the value the app shipped with, so a mistake here is harmless.",
+
+  "_hitFixMinDownMs": "How long a click is held down, at minimum. 1-100, ships as 15.",
+  "hitFixMinDownMs": 15,
+
+  "_hitFixMinUpMs": "The minimum gap between clicks. 1-100, ships as 15.",
+  "hitFixMinUpMs": 15,
+
+  "_recorderEnabled": "Set false to switch the recorder off everywhere, if ffmpeg or Screen Recording turns out to be broken.",
+  "recorderEnabled": true,
+
+  "_notice": "A short line shown in the app - for saying a problem is known and a fix is coming. Empty means nothing is shown. Max 200 characters.",
+  "notice": ""
+}
