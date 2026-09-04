@@ -80,6 +80,10 @@ public class ClickOutputTests
 
         Assert.Contains("33", verdict);
         Assert.Contains("34", verdict);
+
+        // The literals above live in the format string and would pass for any
+        // input. This is the assertion that proves the argument is read.
+        Assert.Contains("193.6", verdict);
     }
 
     [Fact]
