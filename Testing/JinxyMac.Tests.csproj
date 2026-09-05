@@ -54,6 +54,12 @@
     <Compile Include="../Core/Clicker.Tests.cs" />
     <Compile Include="../Engine/IClickEngine.cs" />
     <Compile Include="../Engine/IKeyEngine.cs" />
+    <Compile Include="../Core/KitWheel.cs" />
+    <Compile Include="../Core/KitWheel.Tests.cs" />
+    <Compile Include="../Core/KitImages.cs" />
+    <Compile Include="../Core/KitImages.Tests.cs" />
+    <Compile Include="../Core/KitArt.cs" />
+    <Compile Include="../Core/KitArt.Tests.cs" />
   </ItemGroup>
 
   <ItemGroup>
