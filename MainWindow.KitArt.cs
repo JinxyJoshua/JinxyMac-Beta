@@ -24,7 +24,12 @@ namespace JinxyMac;
 ///
 /// This lives outside <c>Core</c> rather than inside it because
 /// <see cref="Avalonia.Media.Imaging.Bitmap"/> is an Avalonia type — Core has
-/// no Avalonia dependency and the test project compiles it without one.
+/// no Avalonia dependency, and this is where the Avalonia decoding lives
+/// instead. That rule is enforced by <c>CorePurityTests</c>
+/// (<c>Core/CorePurity.Tests.cs</c>), which fails if any file under
+/// <c>Core/</c> references Avalonia — not, as before, by the test project's
+/// package list, which now references Avalonia itself to decode real
+/// bitmaps end to end.
 /// </remarks>
 public static class KitArtImage
 {

@@ -31,6 +31,7 @@
     <Compile Include="../Core/Palette.Tests.cs" />
     <Compile Include="../Core/SystemLoad.cs" />
     <Compile Include="../Core/SystemLoad.Tests.cs" />
+    <Compile Include="../Core/CorePurity.Tests.cs" />
     <Compile Include="../Capture/CaptureBackend.cs" />
     <Compile Include="../Capture/CaptureBackend.Tests.cs" />
     <Compile Include="../Core/RemoteConfig.cs" />
