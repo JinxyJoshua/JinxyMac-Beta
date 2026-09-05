@@ -23,9 +23,11 @@ namespace JinxyMac;
 public partial class MainWindow : Window
 {
     private readonly IClickEngine _engine;
+    private readonly IKeyEngine _keys;
     private readonly IHotkeyWatcher _hotkeys;
     private readonly Clicker _clicker;
     private readonly Shaker _shaker;
+    private readonly MacroRunner _macros;
     private readonly ScreenRecorder _recorder = new();
     private readonly ReplayBuffer _replay = new();
     private readonly List<CaptureDevice> _screens = new();
@@ -84,11 +86,13 @@ public partial class MainWindow : Window
         if (OperatingSystem.IsMacOS())
         {
             _engine = new MacClickEngine();
+            _keys = new MacKeyEngine();
             _hotkeys = new MacHotkeyWatcher();
         }
         else if (OperatingSystem.IsWindows())
         {
             _engine = new WindowsClickEngine();
+            _keys = new WindowsKeyEngine();
             _hotkeys = new WindowsHotkeyWatcher();
         }
         else
@@ -106,6 +110,17 @@ public partial class MainWindow : Window
         // Shares the clicker gate, which is what stops a shake landing between
         // a press and its release and turning the click into a drag.
         _shaker = new Shaker(_engine, _clicker.InputGate);
+
+        _macros = new MacroRunner(_keys)
+        {
+            // Shares the clicker's gate, so a key cannot land between a mouse
+            // press and its release and turn the click into a drag.
+            InputGate = _clicker.InputGate,
+
+            // Lets a dip end when the weapon has actually fired rather than
+            // when a stopwatch says it probably has.
+            Clicks = () => _clicker.ClickCount
+        };
 
         WireNavigation();
         WireClicker();
@@ -149,6 +164,7 @@ public partial class MainWindow : Window
 
             _recorder.Dispose();
             _replay.Dispose();
+            _macros.Dispose();
             _clicker.Dispose();
             _shaker.Dispose();
             _hotkeys.Dispose();
