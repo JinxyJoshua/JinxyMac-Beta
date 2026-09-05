@@ -152,11 +152,25 @@ public static class RobloxCache
         return new CacheReport(freed, files, cleared);
     }
 
-    private static IEnumerable<string> Walk(string root)
+    /// <summary>
+    /// Every file under <paramref name="root"/>, walked eagerly inside the try.
+    /// </summary>
+    /// <remarks>
+    /// <c>EnumerateFiles</c> is lazy — it walks the tree as the caller pulls
+    /// items from it, not when this method is called — so a bare
+    /// <c>return Directory.EnumerateFiles(...)</c> only guards the setup, not
+    /// the walk. An <see cref="IOException"/> or
+    /// <see cref="UnauthorizedAccessException"/> raised partway through — a
+    /// running Roblox deleting a file mid-walk, which happens as a matter of
+    /// course — would then come out of the caller's <c>foreach</c>, uncaught.
+    /// <c>ToArray()</c> forces the whole walk to finish inside this try, the
+    /// same shape <see cref="SubfoldersDeepestFirst"/> already uses.
+    /// </remarks>
+    internal static IEnumerable<string> Walk(string root)
     {
         try
         {
-            return Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories);
+            return Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories).ToArray();
         }
         catch
         {

@@ -130,6 +130,57 @@ public class RobloxCacheTests : IDisposable
         Assert.True(RobloxCache.Depth(order[0]) > RobloxCache.Depth(order[1]));
     }
 
+    /// <summary>
+    /// The bug this replaced: <c>Directory.EnumerateFiles</c> is lazy, so a
+    /// bare <c>try { return Directory.EnumerateFiles(...); }</c> only guards
+    /// the call, not the walk — an exception raised while a caller's own
+    /// <c>foreach</c> pulls items out would come from that foreach, uncaught,
+    /// not from here.
+    /// </summary>
+    /// <remarks>
+    /// The exact race this guards against — a file or folder vanishing while
+    /// <c>EnumerateFiles</c> is still recursing through the tree — is not
+    /// reproducible deterministically from a single thread without an
+    /// abstraction over the file system, which this test file deliberately
+    /// does not use (see the class remarks). What is checked instead is the
+    /// actual mechanism of the fix: that <c>Walk</c> finishes reading the
+    /// whole tree into a concrete array before it returns, rather than handing
+    /// back something that still touches disk when the caller enumerates it.
+    /// Deleting the folder immediately afterwards proves that — if the walk
+    /// were still lazy, enumerating the result below would throw.
+    /// </remarks>
+    [Fact]
+    public void WalkFinishesReadingBeforeItReturns()
+    {
+        Make("cache/a.bin", 10);
+        Make("cache/nested/b.bin", 20);
+        string cachePath = Path.Combine(_root, "cache");
+
+        IEnumerable<string> walked = RobloxCache.Walk(cachePath);
+
+        Directory.Delete(cachePath, recursive: true);
+
+        // If Walk had only guarded the call and not the walk, the directory
+        // being gone now would make this throw instead of yielding the two
+        // files already found.
+        Assert.Equal(2, walked.Count());
+    }
+
+    /// <summary>
+    /// A folder that fails outright — this walks a file, not a directory, so
+    /// <c>EnumerateFiles</c> throws on the very first call rather than partway
+    /// through, but it exercises the same catch.
+    /// </summary>
+    [Fact]
+    public void WalkReturnsNothingRatherThanThrowingWhenTheRootIsUnusable()
+    {
+        string notADirectory = Make("not-a-folder.bin", 5);
+
+        IEnumerable<string> walked = RobloxCache.Walk(notADirectory);
+
+        Assert.Empty(walked);
+    }
+
     [Fact]
     public void ClearingNothingIsNotAnError()
     {

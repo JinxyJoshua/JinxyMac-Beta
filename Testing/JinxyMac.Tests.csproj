@@ -36,6 +36,10 @@
     <Compile Include="../Core/CorePurity.Tests.cs" />
     <Compile Include="../Capture/CaptureBackend.cs" />
     <Compile Include="../Capture/CaptureBackend.Tests.cs" />
+    <Compile Include="../Capture/ArgumentTokens.cs" />
+    <Compile Include="../Capture/ArgumentTokens.Tests.cs" />
+    <Compile Include="../Capture/ReentryGuard.cs" />
+    <Compile Include="../Capture/ReentryGuard.Tests.cs" />
     <Compile Include="../Core/RemoteConfig.cs" />
     <Compile Include="../Core/RemoteConfig.Tests.cs" />
     <Compile Include="../Core/ClickButton.cs" />

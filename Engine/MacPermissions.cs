@@ -45,6 +45,20 @@ public static class MacPermissions
     /// Preflight rather than request: this runs on every visit to the Settings
     /// page, and the requesting call puts a system dialog on screen. Asking is
     /// its own button.
+    ///
+    /// The catch here used to map to <see cref="Permission.NotNeeded"/>, on the
+    /// reasoning that the call only fails on macOS older than 10.15, where the
+    /// permission does not exist. That conflated "could not check" with
+    /// "definitely not granted" — the opposite of what <see cref="Accessibility"/>
+    /// does for the identical failure a few lines up, and the exact distinction
+    /// this file's own remarks say matters. It now fails the same way
+    /// Accessibility does: Denied, not NotNeeded. A build this old already
+    /// requires a macOS new enough that the pre-10.15 branch cannot really be
+    /// reached — <c>net10.0</c> refuses to run on anything from that era — so
+    /// the choice costs nothing on a real machine, and it means a genuine "the
+    /// call broke" is reported as a missing permission (which sends the user
+    /// to System Settings) rather than as nothing to grant (which hides the
+    /// gate this file exists to enforce).
     /// </remarks>
     public static Permission ScreenRecording()
     {
@@ -56,9 +70,7 @@ public static class MacPermissions
         }
         catch
         {
-            // Older than macOS 10.15, where the permission does not exist and
-            // capture simply works.
-            return Permission.NotNeeded;
+            return Permission.Denied;
         }
     }
 

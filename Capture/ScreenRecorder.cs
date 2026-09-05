@@ -29,6 +29,11 @@ public sealed class ScreenRecorder : IDisposable
     private Process? _process;
     private readonly StringBuilder _log = new();
 
+    // Guards StartAsync's own re-entrancy. _process is not assigned until
+    // after the settle delay below, so IsRecording alone cannot stop a second
+    // call arriving during that gap — see StartAsync.
+    private readonly ReentryGuard _starting = new();
+
     public bool IsRecording => _process is { HasExited: false };
 
     public string? OutputPath { get; private set; }
@@ -70,31 +75,50 @@ public sealed class ScreenRecorder : IDisposable
         }
     }
 
+    /// <remarks>
+    /// The re-entrancy guard is entered synchronously, before anything else —
+    /// including the <c>IsRecording</c> check, which is not enough on its own.
+    /// <c>_process</c> is not assigned until after the settle delay in
+    /// <see cref="Launch"/>, so a second call arriving during that roughly
+    /// one-second gap would see <c>IsRecording</c> as false too, and start a
+    /// second ffmpeg that the first's <see cref="StopAsync"/> would never know
+    /// about. Guarding only the caller's button does not close this: a hotkey
+    /// bound straight to this method reaches it exactly the same way.
+    /// </remarks>
     public async Task<string> StartAsync(string outputDirectory, int framesPerSecond,
                                          CaptureDevice? screen = null)
     {
-        if (IsRecording) throw new InvalidOperationException("Already recording.");
+        if (!_starting.TryEnter()) throw new InvalidOperationException("Already recording.");
 
-        string ffmpeg = Ffmpeg.Find()
-            ?? throw new FileNotFoundException($"ffmpeg was not found. {Ffmpeg.InstallHint}");
+        try
+        {
+            if (IsRecording) throw new InvalidOperationException("Already recording.");
 
-        Directory.CreateDirectory(outputDirectory);
+            string ffmpeg = Ffmpeg.Find()
+                ?? throw new FileNotFoundException($"ffmpeg was not found. {Ffmpeg.InstallHint}");
 
-        string path = Path.Combine(outputDirectory,
-            $"clip-{DateTime.Now:yyyy-MM-dd-HHmmss}.mp4");
+            Directory.CreateDirectory(outputDirectory);
 
-        if (await Launch(ffmpeg, path, screen, framesPerSecond, withFramerate: true))
-            return path;
+            string path = Path.Combine(outputDirectory,
+                $"clip-{DateTime.Now:yyyy-MM-dd-HHmmss}.mp4");
 
-        // Only the framerate is worth a second attempt. A permission failure
-        // will fail again identically, and retrying it just hides the message.
-        if (!LastError.Contains("framerate", StringComparison.OrdinalIgnoreCase))
+            if (await Launch(ffmpeg, path, screen, framesPerSecond, withFramerate: true))
+                return path;
+
+            // Only the framerate is worth a second attempt. A permission failure
+            // will fail again identically, and retrying it just hides the message.
+            if (!LastError.Contains("framerate", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException(Describe());
+
+            if (await Launch(ffmpeg, path, screen, framesPerSecond, withFramerate: false))
+                return path;
+
             throw new InvalidOperationException(Describe());
-
-        if (await Launch(ffmpeg, path, screen, framesPerSecond, withFramerate: false))
-            return path;
-
-        throw new InvalidOperationException(Describe());
+        }
+        finally
+        {
+            _starting.Exit();
+        }
     }
 
     /// <returns>False if ffmpeg died in the first moment, which means it never
@@ -104,13 +128,7 @@ public sealed class ScreenRecorder : IDisposable
     {
         _log.Clear();
 
-        string arguments =
-            $"-y {CaptureBackend.InputArgs(screen, framesPerSecond, withFramerate)} "
-            + $"{CaptureBackend.EncoderArgs(ffmpeg)} "
-            + $"{CaptureBackend.OutputArgs(framesPerSecond)} "
-            + $"-movflags +faststart \"{path}\"";
-
-        var info = new ProcessStartInfo(ffmpeg, arguments)
+        var info = new ProcessStartInfo(ffmpeg)
         {
             UseShellExecute = false,
             CreateNoWindow = true,
@@ -118,6 +136,28 @@ public sealed class ScreenRecorder : IDisposable
             RedirectStandardError = true,
             RedirectStandardOutput = true
         };
+
+        // ArgumentList, not an interpolated string: the clip folder is
+        // whatever the user typed or picked, and macOS folder names can
+        // contain a double quote. Building one quoted string out of it would
+        // let a folder like Jinxy "Clips" corrupt the command line; adding it
+        // as its own ArgumentList entry needs no escaping at all, because no
+        // shell ever parses it — it goes to the child process as one atomic
+        // argument regardless of what characters it holds.
+        info.ArgumentList.Add("-y");
+
+        foreach (string token in ArgumentTokens.Split(CaptureBackend.InputArgs(screen, framesPerSecond, withFramerate)))
+            info.ArgumentList.Add(token);
+
+        foreach (string token in ArgumentTokens.Split(CaptureBackend.EncoderArgs(ffmpeg)))
+            info.ArgumentList.Add(token);
+
+        foreach (string token in ArgumentTokens.Split(CaptureBackend.OutputArgs(framesPerSecond)))
+            info.ArgumentList.Add(token);
+
+        info.ArgumentList.Add("-movflags");
+        info.ArgumentList.Add("+faststart");
+        info.ArgumentList.Add(path);
 
         Process process = Process.Start(info)
             ?? throw new InvalidOperationException("ffmpeg would not start.");

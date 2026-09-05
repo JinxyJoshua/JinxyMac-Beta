@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 
 namespace JinxyMac.Capture;
 
@@ -27,57 +28,98 @@ public sealed class ReplayBuffer : IDisposable
     private Process? _process;
     private string? _bufferDirectory;
 
+    // Guards Start's own re-entrancy against concurrent callers — a hotkey
+    // thread and the UI both reach this, and everything between the IsRunning
+    // check and the _process assignment below (file cleanup, spawning
+    // ffmpeg) is real work with no lock of its own. Two threads that both pass
+    // the check before either assigns _process would each start ffmpeg, and
+    // the second would silently orphan the first exactly like the recorder's
+    // own bug.
+    private readonly ReentryGuard _starting = new();
+
     public bool IsRunning => _process is { HasExited: false };
 
     public int CapacitySeconds { get; private set; }
 
     public void Start(int capacitySeconds, int framesPerSecond, CaptureDevice? screen = null)
     {
-        if (IsRunning) return;
+        if (!_starting.TryEnter()) return;
 
-        string ffmpeg = Ffmpeg.Find()
-            ?? throw new FileNotFoundException($"ffmpeg was not found. {Ffmpeg.InstallHint}");
-
-        CapacitySeconds = Math.Max(10, capacitySeconds);
-
-        _bufferDirectory = Path.Combine(Path.GetTempPath(), "JinxyMac", "replay");
-        Directory.CreateDirectory(_bufferDirectory);
-
-        foreach (string stale in Directory.GetFiles(_bufferDirectory, "buf*.ts"))
+        try
         {
-            try { File.Delete(stale); } catch { /* in use by a previous run */ }
+            if (IsRunning) return;
+
+            string ffmpeg = Ffmpeg.Find()
+                ?? throw new FileNotFoundException($"ffmpeg was not found. {Ffmpeg.InstallHint}");
+
+            CapacitySeconds = Math.Max(10, capacitySeconds);
+
+            _bufferDirectory = Path.Combine(Path.GetTempPath(), "JinxyMac", "replay");
+            Directory.CreateDirectory(_bufferDirectory);
+
+            foreach (string stale in Directory.GetFiles(_bufferDirectory, "buf*.ts"))
+            {
+                try { File.Delete(stale); } catch { /* in use by a previous run */ }
+            }
+
+            string pattern = Path.Combine(_bufferDirectory, "buf%04d.ts");
+
+            var info = new ProcessStartInfo(ffmpeg)
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardInput = true,
+                RedirectStandardError = true,
+                RedirectStandardOutput = true
+            };
+
+            // -g forces a keyframe every segment, so each one decodes on its own
+            // and the pieces can be joined without re-encoding.
+            //
+            // The buffer runs for the whole session, so its cost matters more
+            // than the recorder's — this is the one that would sit on two cores
+            // all game, which is why the hardware encoder is not optional here.
+            //
+            // ArgumentList throughout, for the same reason as the recorder:
+            // the segment pattern lives under a fixed temp path today, but
+            // nothing here should depend on that staying true.
+            info.ArgumentList.Add("-y");
+
+            foreach (string token in ArgumentTokens.Split(CaptureBackend.InputArgs(screen, framesPerSecond)))
+                info.ArgumentList.Add(token);
+
+            foreach (string token in ArgumentTokens.Split(CaptureBackend.EncoderArgs(ffmpeg)))
+                info.ArgumentList.Add(token);
+
+            foreach (string token in ArgumentTokens.Split(CaptureBackend.OutputArgs(framesPerSecond)))
+                info.ArgumentList.Add(token);
+
+            info.ArgumentList.Add("-g");
+            info.ArgumentList.Add(framesPerSecond.ToString(CultureInfo.InvariantCulture));
+            info.ArgumentList.Add("-f");
+            info.ArgumentList.Add("segment");
+            info.ArgumentList.Add("-segment_time");
+            info.ArgumentList.Add(SegmentSeconds.ToString(CultureInfo.InvariantCulture));
+            info.ArgumentList.Add("-segment_format");
+            info.ArgumentList.Add("mpegts");
+            info.ArgumentList.Add("-segment_wrap");
+            info.ArgumentList.Add((CapacitySeconds / SegmentSeconds + 1).ToString(CultureInfo.InvariantCulture));
+            info.ArgumentList.Add("-reset_timestamps");
+            info.ArgumentList.Add("1");
+            info.ArgumentList.Add(pattern);
+
+            _process = Process.Start(info) ?? throw new InvalidOperationException("ffmpeg would not start.");
+
+            // Undrained pipes fill and stall the process partway through.
+            _process.ErrorDataReceived += (_, _) => { };
+            _process.OutputDataReceived += (_, _) => { };
+            _process.BeginErrorReadLine();
+            _process.BeginOutputReadLine();
         }
-
-        string pattern = Path.Combine(_bufferDirectory, "buf%04d.ts");
-
-        // -g forces a keyframe every segment, so each one decodes on its own and
-        // the pieces can be joined without re-encoding.
-        //
-        // The buffer runs for the whole session, so its cost matters more than
-        // the recorder's — this is the one that would sit on two cores all game,
-        // which is why the hardware encoder is not optional here.
-        string arguments =
-            $"-y {CaptureBackend.InputArgs(screen, framesPerSecond)} "
-            + $"{CaptureBackend.EncoderArgs(ffmpeg)} {CaptureBackend.OutputArgs(framesPerSecond)} -g {framesPerSecond} "
-            + $"-f segment -segment_time {SegmentSeconds} -segment_format mpegts "
-            + $"-segment_wrap {CapacitySeconds / SegmentSeconds + 1} -reset_timestamps 1 \"{pattern}\"";
-
-        var info = new ProcessStartInfo(ffmpeg, arguments)
+        finally
         {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardInput = true,
-            RedirectStandardError = true,
-            RedirectStandardOutput = true
-        };
-
-        _process = Process.Start(info) ?? throw new InvalidOperationException("ffmpeg would not start.");
-
-        // Undrained pipes fill and stall the process partway through.
-        _process.ErrorDataReceived += (_, _) => { };
-        _process.OutputDataReceived += (_, _) => { };
-        _process.BeginErrorReadLine();
-        _process.BeginOutputReadLine();
+            _starting.Exit();
+        }
     }
 
     /// <summary>
@@ -108,18 +150,30 @@ public sealed class ReplayBuffer : IDisposable
         string output = Path.Combine(outputDirectory, $"replay-{DateTime.Now:yyyy-MM-dd-HHmmss}.mp4");
         string joined = string.Join("|", newest.Select(f => f.FullName));
 
-        // Stream copy: no re-encode, so saving is near-instant and costs nothing
-        // beyond the read. -t trims the leading overshoot from the extra segment.
-        string arguments =
-            $"-y -i \"concat:{joined}\" -c copy -t {seconds} -movflags +faststart \"{output}\"";
-
-        var info = new ProcessStartInfo(ffmpeg, arguments)
+        var info = new ProcessStartInfo(ffmpeg)
         {
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardError = true,
             RedirectStandardOutput = true
         };
+
+        // ArgumentList, not an interpolated string: outputDirectory is the
+        // user's clip folder, and a folder name holding a double quote would
+        // otherwise corrupt this command line — see ScreenRecorder.Launch for
+        // the full story. Stream copy: no re-encode, so saving is near-instant
+        // and costs nothing beyond the read. -t trims the leading overshoot
+        // from the extra segment.
+        info.ArgumentList.Add("-y");
+        info.ArgumentList.Add("-i");
+        info.ArgumentList.Add($"concat:{joined}");
+        info.ArgumentList.Add("-c");
+        info.ArgumentList.Add("copy");
+        info.ArgumentList.Add("-t");
+        info.ArgumentList.Add(seconds.ToString(CultureInfo.InvariantCulture));
+        info.ArgumentList.Add("-movflags");
+        info.ArgumentList.Add("+faststart");
+        info.ArgumentList.Add(output);
 
         using Process? process = Process.Start(info);
         if (process == null) return null;

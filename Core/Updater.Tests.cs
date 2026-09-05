@@ -81,4 +81,73 @@ public class UpdaterTests
 
         Assert.Equal("87 MB", update.SizeText);
     }
+
+    // ---- pinning the release asset host ----
+
+    /// <summary>
+    /// What browser_download_url actually looks like in a real GitHub API
+    /// reply, and the CDN host a real download of one redirects to.
+    /// </summary>
+    [Theory]
+    [InlineData("https://github.com/JinxyJoshua/JinxyMac-Beta/releases/download/v1.2.2/JinxyMac.tar.gz")]
+    [InlineData("https://objects.githubusercontent.com/github-production-release-asset/1/abc")]
+    [InlineData("https://release-assets.githubusercontent.com/github-production-release-asset/1/abc")]
+    public void TrustsGitHubsOwnHosts(string url)
+    {
+        Assert.True(Updater.IsTrustedAssetUrl(url));
+    }
+
+    /// <summary>
+    /// The bug this exists to prevent: the address in a JSON reply is just a
+    /// string until something checks it, and this is the one that gets
+    /// downloaded and unpacked over the running app.
+    /// </summary>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("not a url")]
+    [InlineData("http://github.com/JinxyJoshua/JinxyMac-Beta/releases/download/v1.2.2/JinxyMac.tar.gz")] // http, not https
+    [InlineData("https://github.com.evil.example/JinxyJoshua/JinxyMac-Beta/x.tar.gz")] // host merely starts with github.com
+    [InlineData("https://notgithubusercontent.com/x.tar.gz")] // suffix trick without the dot
+    [InlineData("https://evil.example/x.tar.gz")]
+    [InlineData("file:///etc/passwd")]
+    public void RejectsEverythingElse(string? url)
+    {
+        Assert.False(Updater.IsTrustedAssetUrl(url));
+    }
+
+    // ---- quoting the swap script's own paths ----
+
+    /// <summary>
+    /// The mechanism the swap script leans on: single quotes stop everything a
+    /// shell would otherwise do with the characters inside them, unlike the
+    /// double quotes the script used before, which still let <c>$</c>,
+    /// backticks and backslashes through.
+    /// </summary>
+    [Theory]
+    [InlineData("/Applications/JinxyMac.app", "'/Applications/JinxyMac.app'")]
+    [InlineData("$HOME/x", "'$HOME/x'")]
+    [InlineData("`whoami`", "'`whoami`'")]
+    [InlineData("a\\b", "'a\\b'")]
+    [InlineData("say \"hi\"", "'say \"hi\"'")]
+    public void QuotesOrdinaryAndHostileCharactersLiterally(string value, string expected)
+    {
+        Assert.Equal(expected, Updater.ShellQuote(value));
+    }
+
+    /// <summary>
+    /// The one character single quotes cannot contain on their own — closed,
+    /// escaped, reopened, the standard POSIX way.
+    /// </summary>
+    [Fact]
+    public void EscapesAnEmbeddedSingleQuote()
+    {
+        Assert.Equal("'/Users/bob'\\''s Mac/JinxyMac.app'", Updater.ShellQuote("/Users/bob's Mac/JinxyMac.app"));
+    }
+
+    [Fact]
+    public void QuotingAnEmptyPathStillProducesAValidToken()
+    {
+        Assert.Equal("''", Updater.ShellQuote(""));
+    }
 }

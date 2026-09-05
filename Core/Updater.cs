@@ -93,10 +93,18 @@ public static class Updater
 
                 if (!name.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase)) continue;
 
+                string url = asset.GetProperty("browser_download_url").GetString() ?? "";
+
+                // A reply is JSON from an API call that host-pinning already
+                // protects, but the address inside it is what actually gets
+                // downloaded and unpacked over the app bundle — worth checking
+                // on its own rather than trusting the document that carried it.
+                if (!IsTrustedAssetUrl(url)) continue;
+
                 return new Available(
                     version,
                     root.GetProperty("body").GetString() ?? "",
-                    asset.GetProperty("browser_download_url").GetString() ?? "",
+                    url,
                     asset.GetProperty("size").GetInt64());
             }
 
@@ -137,21 +145,50 @@ public static class Updater
         .ToArray();
 
     /// <summary>
+    /// Whether a release asset address is one GitHub itself would have handed
+    /// back.
+    /// </summary>
+    /// <remarks>
+    /// Pinned the same way <see cref="KitArt.IsWikiImage"/> pins the wiki's —
+    /// the JSON that carries this address comes from GitHub's API, but the
+    /// address itself is just a string in that document until something
+    /// checks it, and this is the one that gets downloaded and unpacked over
+    /// the running app. github.com is what the API hands back; the
+    /// githubusercontent.com suffix covers the CDN host a real download
+    /// redirects to.
+    /// </remarks>
+    internal static bool IsTrustedAssetUrl(string? url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out Uri? uri)
+        && uri.Scheme == Uri.UriSchemeHttps
+        && (uri.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase)
+            || uri.Host.EndsWith(".githubusercontent.com", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
     /// Downloads and installs an update, then relaunches.
     /// </summary>
     /// <remarks>
     /// The swap is done by a detached shell script rather than in process, for
     /// the obvious reason: this code lives inside the bundle being replaced.
     ///
-    /// The script keeps the old bundle until the new one is in place and puts it
-    /// back if anything fails. A half-finished update is the one outcome worse
-    /// than no update, because the person it happens to has no working copy left
-    /// to report it from.
+    /// The new bundle is fully copied into place next to the old one — on the
+    /// same volume — before either is touched, so the swap itself is two
+    /// renames rather than a copy. Renaming is atomic; a copy of a
+    /// several-hundred-megabyte bundle is not, and the live path must never
+    /// sit empty for however long that copy takes. The script puts the old
+    /// bundle back if the second rename fails. A half-finished update is the
+    /// one outcome worse than no update, because the person it happens to has
+    /// no working copy left to report it from.
     /// </remarks>
     /// <returns>An error to show, or null if the relaunch is under way.</returns>
     public static async Task<string?> InstallAsync(Available update, IProgress<double>? progress = null)
     {
         if (!OperatingSystem.IsMacOS()) return "Updating is a macOS path.";
+
+        // Checked here too, not just where the feed is parsed: this is the
+        // call that actually downloads and unpacks it over the running app,
+        // and it should not have to trust that its caller checked first.
+        if (!IsTrustedAssetUrl(update.Url))
+            return "The update address was not a GitHub release asset.";
 
         string bundle = BundlePath();
         if (bundle.Length == 0) return "Cannot find the running app bundle to replace.";
@@ -180,7 +217,13 @@ public static class Updater
             string script = WriteSwapScript(work, staged, bundle);
 
             // Detached, so it outlives the process it is about to replace.
-            Process.Start(new ProcessStartInfo("/bin/sh", script) { UseShellExecute = false });
+            //
+            // ArgumentList, not the Arguments string: $TMPDIR (where the
+            // script lives) can contain a space, and a raw arguments string
+            // would split on it and hand /bin/sh two words instead of a path.
+            var swap = new ProcessStartInfo("/bin/sh") { UseShellExecute = false };
+            swap.ArgumentList.Add(script);
+            Process.Start(swap);
 
             return null;
         }
@@ -217,42 +260,86 @@ public static class Updater
     /// The script that does the replacing, once this process is gone.
     /// </summary>
     /// <remarks>
-    /// ditto rather than cp or mv: it is the tool that preserves an app
-    /// bundle's permissions and extended attributes, and a bundle copied with
-    /// anything else can arrive without its executable bit.
+    /// ditto rather than cp or mv to stage the copy: it is the tool that
+    /// preserves an app bundle's permissions and extended attributes, and a
+    /// bundle copied with anything else can arrive without its executable bit.
+    ///
+    /// The copy lands at <c>bundle.new</c>, a sibling of the live bundle, not
+    /// on top of it. That is what makes the actual swap two renames instead of
+    /// a copy: <c>mv</c> between two paths in the same directory is a same-
+    /// volume rename, and a rename is atomic — the live path is never briefly
+    /// missing the way it would be if <c>ditto</c> wrote straight over it.
+    /// Only once the full copy has landed does anything at the live path move.
+    ///
+    /// Every path here is attacker-shaped as far as the shell is concerned —
+    /// it is wherever the user chose to put the app — so each one is wrapped
+    /// with <see cref="ShellQuote"/> rather than bare double quotes, which stop
+    /// nothing: a folder named with a backtick or a "$(...)" would otherwise
+    /// run as a command inside this script.
     /// </remarks>
     private static string WriteSwapScript(string work, string staged, string bundle)
     {
         string path = Path.Combine(work, "swap.sh");
+        string fresh = bundle + ".new";
         string backup = bundle + ".old";
 
         string script = string.Join('\n',
             "#!/bin/sh",
-            "# Waits for Jinxy to quit, swaps the bundle, puts the old one back",
-            "# if the new one does not land, then reopens whichever survived.",
+            "# Waits for Jinxy to quit, copies the new bundle in next to the old",
+            "# one, then swaps both with a pair of same-volume renames so the",
+            "# live path is never missing longer than those two renames take.",
+            "# Puts the old bundle back if the second rename fails, then",
+            "# reopens whichever survived.",
             "",
             "for _ in $(seq 1 50); do",
             "    pgrep -x JinxyMac >/dev/null 2>&1 || break",
             "    sleep 0.2",
             "done",
             "",
-            $"rm -rf \"{backup}\"",
-            $"mv \"{bundle}\" \"{backup}\" || exit 1",
-            "",
-            $"if /usr/bin/ditto \"{staged}\" \"{bundle}\"; then",
-            $"    rm -rf \"{backup}\"",
-            "else",
-            $"    rm -rf \"{bundle}\"",
-            $"    mv \"{backup}\" \"{bundle}\"",
+            "# Still running after ten seconds: swapping now would replace the",
+            "# directory a live process is executing from. Leave it alone.",
+            "if pgrep -x JinxyMac >/dev/null 2>&1; then",
+            "    exit 1",
             "fi",
             "",
-            $"/usr/bin/open \"{bundle}\"",
-            $"rm -rf \"{work}\" 2>/dev/null");
+            $"rm -rf {ShellQuote(fresh)} {ShellQuote(backup)}",
+            "",
+            "# Fully staged beside the live bundle, on its volume, before",
+            "# anything at the live path is touched. A truncated or interrupted",
+            "# copy fails here, where the original is still whole.",
+            $"/usr/bin/ditto {ShellQuote(staged)} {ShellQuote(fresh)} || {{ rm -rf {ShellQuote(fresh)}; exit 1; }}",
+            "",
+            $"mv {ShellQuote(bundle)} {ShellQuote(backup)} || {{ rm -rf {ShellQuote(fresh)}; exit 1; }}",
+            "",
+            $"if mv {ShellQuote(fresh)} {ShellQuote(bundle)}; then",
+            $"    rm -rf {ShellQuote(backup)}",
+            "else",
+            $"    mv {ShellQuote(backup)} {ShellQuote(bundle)}",
+            $"    rm -rf {ShellQuote(fresh)}",
+            "fi",
+            "",
+            $"/usr/bin/open {ShellQuote(bundle)}",
+            $"rm -rf {ShellQuote(work)} 2>/dev/null");
 
         File.WriteAllText(path, script);
 
         return path;
     }
+
+    /// <summary>
+    /// Wraps a path in single quotes so <c>/bin/sh</c> treats it as one
+    /// literal argument.
+    /// </summary>
+    /// <remarks>
+    /// Single quotes, not double: double quotes still let <c>$</c>, backticks
+    /// and backslashes through, and every path this script embeds is a
+    /// filesystem path the user chose, not a literal this code wrote. Single
+    /// quotes suppress all of that — the only character they cannot contain is
+    /// another single quote, handled the standard POSIX way: close the quote,
+    /// emit an escaped one, reopen it.
+    /// </remarks>
+    internal static string ShellQuote(string value) =>
+        "'" + value.Replace("'", "'\\''") + "'";
 
     /// <summary>The .app this code is running from, or empty if it is not in one.</summary>
     private static string BundlePath()
@@ -268,6 +355,20 @@ public static class Updater
         return "";
     }
 
+    /// <summary>
+    /// Runs a command to completion, the same shape as <c>Ffmpeg.Run</c> in
+    /// the Capture namespace.
+    /// </summary>
+    /// <remarks>
+    /// Both streams are drained before the wait, not after: left unread, a
+    /// child that writes enough of either — <c>tar</c> on a corrupt archive,
+    /// or one with extended-attribute warnings, easily does — fills the pipe
+    /// and blocks forever, which is a hang <c>WaitForExit</c> never gets the
+    /// chance to time out on. A timeout that does land kills the process tree
+    /// rather than falling through: reading <c>ExitCode</c> on a process that
+    /// has not exited throws, and letting that reach the catch below would
+    /// report a plain failure while leaving <c>tar</c> running.
+    /// </remarks>
     private static bool Run(string command, string[] arguments)
     {
         try
@@ -285,7 +386,20 @@ public static class Updater
             using Process? process = Process.Start(info);
             if (process == null) return false;
 
-            process.WaitForExit(120_000);
+            Task<string> error = process.StandardError.ReadToEndAsync();
+            Task<string> output = process.StandardOutput.ReadToEndAsync();
+
+            if (!process.WaitForExit(120_000))
+            {
+                try { process.Kill(entireProcessTree: true); } catch { /* already gone */ }
+                return false;
+            }
+
+            // Forced to complete before the process is disposed, exactly as
+            // in Ffmpeg.Run — the pipes closed when the process exited above,
+            // so both are already done or a moment from it.
+            _ = error.Result;
+            _ = output.Result;
 
             return process.ExitCode == 0;
         }
