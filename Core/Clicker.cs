@@ -36,6 +36,7 @@ public sealed class Clicker : IDisposable
     private readonly object _inputGate = new();
 
     private CancellationTokenSource? _cts;
+    private Thread? _thread;
     private long _clicks;
     private volatile ClickSettings _settings = new(10, 0.5, HitFix: true, Spin: false);
 
@@ -55,19 +56,36 @@ public sealed class Clicker : IDisposable
     {
         if (IsRunning) return;
 
+        // Join whatever thread the previous Stop() left running, before this
+        // one exists. Its token was already cancelled by that Stop(), so it is
+        // already on its way out: the longest it can still be doing real work
+        // is one CoarseSleepSliceMs slice, or the 50 ms sleep taken when Cps is
+        // below MinimumCps — both far under the bound below, so in practice
+        // this does not wait at all. Doing the join here rather than in Stop()
+        // keeps Stop() non-blocking for its caller (the UI/hotkey thread),
+        // where a wait could otherwise run to the length of a held-down click
+        // — up to ~1s at a low CPS and high duty cycle.
+        //
+        // This is also what actually closes the race described on the rescue
+        // release in Loop's finally: with this join, a new thread cannot exist
+        // until the old one — rescue release included — has already finished.
+        _thread?.Join(JoinTimeoutMs);
+
         _cts = new CancellationTokenSource();
         CancellationToken token = _cts.Token;
 
-        new Thread(() => Loop(token))
+        _thread = new Thread(() => Loop(token))
         {
             IsBackground = true,
             Priority = ThreadPriority.AboveNormal,
             Name = "ClickEngine"
-        }.Start();
+        };
+        _thread.Start();
     }
 
     public void Stop()
     {
+        // Deliberately does not join: see Start(), which does.
         _cts?.Cancel();
         _cts = null;
     }
@@ -140,20 +158,31 @@ public sealed class Clicker : IDisposable
         {
             // The one that was pressed, whatever is selected now.
             //
-            // This release only runs because a send already threw, and the
-            // usual reason — Accessibility permission revoked mid-run — is
-            // still true here, so the release is likely to throw the same
-            // way. Guarded because that second throw has nowhere left to go
-            // but out of this background thread, which kills the process —
-            // exactly what the catch above exists to prevent.
+            // This is not only a throw path. On an ordinary Stop(), the
+            // token is observed cancelled between MouseDown and the gated
+            // MouseUp above (WaitUntil returns false), so that MouseUp is
+            // skipped, `held` stays set, and this is what actually releases
+            // the button. Gated for the same reason the press-release pair
+            // above is: Stop() does not join its thread (see Stop()), so
+            // without this lock a fast restart's new thread could slip its
+            // own gated MouseDown/MouseUp in between this thread dropping
+            // the lock above and this release running — turning the click
+            // into a drag, which is exactly what _inputGate exists to
+            // prevent. Taking the same lock here serializes the two, and
+            // Start()'s join (see Start()) means there is normally no new
+            // thread racing this one at all.
             if (held is ClickButton stuck)
             {
-                try { _engine.MouseUp(stuck); }
+                try
+                {
+                    lock (_inputGate) { _engine.MouseUp(stuck); }
+                }
                 catch
                 {
-                    // See above: the release can fail for the same reason
-                    // the send did, and must not be allowed to take the
-                    // process down with it.
+                    // The release can still fail here — the same reason an
+                    // earlier send may have thrown (Accessibility permission
+                    // revoked mid-run) is often still true — and must not be
+                    // allowed to take the process down with it.
                 }
             }
         }
@@ -166,6 +195,7 @@ public sealed class Clicker : IDisposable
     private static bool WaitUntil(long target, bool spin, CancellationToken token)
     {
         long freq = Stopwatch.Frequency;
+        var spinner = new SpinWait();
 
         while (true)
         {
@@ -188,8 +218,23 @@ public sealed class Clicker : IDisposable
                 continue;
             }
 
-            if (ms > 2.0) Thread.Sleep(1);
-            else Thread.SpinWait(40);
+            if (ms > 2.0)
+            {
+                Thread.Sleep(1);
+            }
+            else
+            {
+                // SpinOnce, not a bare Thread.SpinWait: this branch runs up to
+                // twice a cycle with Ultra Accuracy on, and a spin that never
+                // yields burns a core against the game the whole time. This is
+                // the same fix, for the same reason, as MacroRunner.Wait
+                // (Core/KeyMacro.cs) — the two loops now spin the same way, so
+                // a stutter fixed in one shape does not linger in the other.
+                // sleep1Threshold: -1 disables SpinOnce's own escalation to
+                // Sleep(1), which would overshoot this branch's already-tight
+                // 2 ms window.
+                spinner.SpinOnce(sleep1Threshold: -1);
+            }
         }
     }
 
@@ -210,4 +255,10 @@ public sealed class Clicker : IDisposable
 
     private const double CatchUpPeriods = 4.0;
     private const int CoarseSleepSliceMs = 20;
+
+    /// <summary>
+    /// Bound on Start()'s join of the outgoing thread. Generous: see Start()
+    /// for why the real wait is normally nowhere near this.
+    /// </summary>
+    private const int JoinTimeoutMs = 500;
 }

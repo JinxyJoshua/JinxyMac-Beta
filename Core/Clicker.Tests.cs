@@ -193,4 +193,70 @@ public class ClickerTests
 
         Assert.Null(held);
     }
+
+    /// <summary>
+    /// The restart race: Stop() cancels and detaches without joining, so the
+    /// old thread can still be mid-press when Start() spins up a new one. If
+    /// the rescue release in Loop's `finally` were not gated the same as the
+    /// ordinary release, the old thread's release could land between the new
+    /// thread's gated MouseDown and MouseUp — turning that click into a drag.
+    /// </summary>
+    /// <remarks>
+    /// This is a deterministic regression test, not a probabilistic one: it
+    /// does not rely on hitting a narrow timing window by chance. Start()
+    /// joins the thread the previous Stop() left running (bounded, but the
+    /// token is already cancelled by then so the join is normally immediate)
+    /// before a new thread can exist, so there is structurally never more
+    /// than one Loop thread alive per Clicker. That makes the invariant below
+    /// — no down ever follows another down without an intervening up of the
+    /// same button — true on every run, not just probably true, which is why
+    /// this is worth asserting rather than only exercising.
+    /// </remarks>
+    [Fact]
+    public void StopThenImmediateRestart_NeverOverlapsMouseState()
+    {
+        var engine = new FakeClickEngine();
+        using var clicker = new Clicker(engine);
+
+        // 8 CPS / 90% duty resolves, via HitFix, to a long press relative to
+        // the gap, so stopping soon after start reliably lands mid-press.
+        clicker.Apply(new ClickSettings(8, 0.9, true, false, ClickButton.Right));
+        clicker.Start();
+
+        for (int i = 0; i < 500 && engine.Events.Count == 0; i++)
+            Thread.Sleep(2);
+
+        Assert.NotEmpty(engine.Events);
+        Thread.Sleep(30); // comfortably inside the open press
+
+        // Stop and restart back-to-back, with nothing in between -- exactly
+        // the window finding 1 describes.
+        clicker.Stop();
+        clicker.Start();
+
+        Thread.Sleep(400);
+        clicker.Stop();
+        Thread.Sleep(200);
+
+        var events = engine.Events;
+        Assert.NotEmpty(events);
+
+        ClickButton? held = null;
+
+        foreach ((ClickButton button, bool down) in events)
+        {
+            if (down)
+            {
+                Assert.Null(held);
+                held = button;
+            }
+            else
+            {
+                Assert.Equal(held, button);
+                held = null;
+            }
+        }
+
+        Assert.Null(held);
+    }
 }

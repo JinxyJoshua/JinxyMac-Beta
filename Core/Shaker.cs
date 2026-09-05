@@ -28,6 +28,7 @@ public sealed class Shaker : IDisposable
     private readonly object _inputGate;
 
     private CancellationTokenSource? _cts;
+    private Thread? _thread;
 
     // A record struct cannot be volatile, and a torn read here would be a
     // wrong-sized jump. The lock is uncontended in practice: one writer on the
@@ -60,18 +61,36 @@ public sealed class Shaker : IDisposable
     {
         if (IsRunning) return;
 
+        // Join whatever thread the previous Stop() left running, before this
+        // one exists — the same fix, for the same reason, as Clicker.Start()
+        // (Core/Clicker.cs). Without it, a fast Stop()-then-Start() (up to
+        // 250 ms at MinSpeed, per Loop's interval) can leave two Loop threads
+        // alive whose origin bookkeeping (offsetX/offsetY, both local to
+        // Loop) disagrees — the old thread's `finally` undo subtracts an
+        // offset the new thread's fresh, zeroed locals never re-created. This
+        // join makes that impossible: the old thread, undo included, always
+        // finishes before the new one exists. The wait here is bounded and
+        // normally short — the token is already cancelled by the preceding
+        // Stop(), so the old thread is already on its way out.
+        _thread?.Join(JoinTimeoutMs);
+
         _cts = new CancellationTokenSource();
         CancellationToken token = _cts.Token;
 
-        new Thread(() => Loop(token))
+        _thread = new Thread(() => Loop(token))
         {
             IsBackground = true,
             Name = "ShakeEngine"
-        }.Start();
+        };
+        _thread.Start();
     }
 
     public void Stop()
     {
+        // Deliberately does not join: see Start(), which does. Joining here
+        // would block the caller (the UI/hotkey thread) for as long as the
+        // gate below can be held — close to a second at a low CPS and high
+        // duty cycle.
         _cts?.Cancel();
         _cts = null;
     }
@@ -124,7 +143,26 @@ public sealed class Shaker : IDisposable
         {
             // Undo the outstanding displacement so the crosshair ends where it
             // began, rather than wherever the last random step left it.
-            if (offsetX != 0 || offsetY != 0) Move(-offsetX, -offsetY);
+            //
+            // Move can fail here for the same reason it can fail in the loop
+            // above — the gate timed out — and at exactly the moment that is
+            // most likely: a low CPS with a high duty cycle can hold the gate
+            // for close to a second, which comfortably outlasts one GateWaitMs
+            // wait. Unlike the loop above, there is no next step to fold a
+            // skipped one into — this is the last thing this thread does — so
+            // a single dropped attempt would leave the crosshair permanently
+            // off by up to 9px. Retry instead of accepting that, bounded so a
+            // truly stuck gate cannot hang this thread forever.
+            if (offsetX != 0 || offsetY != 0)
+            {
+                int dx = -offsetX, dy = -offsetY;
+                long deadline = Environment.TickCount64 + FinalUndoTimeoutMs;
+
+                while (!Move(dx, dy) && Environment.TickCount64 < deadline)
+                {
+                    // Move already waited GateWaitMs inside; nothing to add here.
+                }
+            }
         }
     }
 
@@ -157,4 +195,17 @@ public sealed class Shaker : IDisposable
 
     /// <summary>Longest to wait for a press to finish before skipping a step.</summary>
     private const int GateWaitMs = 120;
+
+    /// <summary>
+    /// Total time the return-to-origin retry is allowed, across as many
+    /// GateWaitMs-bounded attempts as it takes. Comfortably above the "close
+    /// to a second" the gate can be held at a low CPS and high duty cycle.
+    /// </summary>
+    private const long FinalUndoTimeoutMs = 3000;
+
+    /// <summary>
+    /// Bound on Start()'s join of the outgoing thread. Generous: see Start()
+    /// for why the real wait is normally nowhere near this.
+    /// </summary>
+    private const int JoinTimeoutMs = 500;
 }

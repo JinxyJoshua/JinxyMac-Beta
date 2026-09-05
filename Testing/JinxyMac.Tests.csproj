@@ -64,6 +64,8 @@
     <Compile Include="../Capture/Ffmpeg.cs" />
     <Compile Include="../Core/Clicker.cs" />
     <Compile Include="../Core/Clicker.Tests.cs" />
+    <Compile Include="../Core/Shaker.cs" />
+    <Compile Include="../Core/Shaker.Tests.cs" />
     <Compile Include="../Engine/IClickEngine.cs" />
     <Compile Include="../Engine/IKeyEngine.cs" />
     <Compile Include="../Core/KitWheel.cs" />

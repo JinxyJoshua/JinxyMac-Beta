@@ -24,13 +24,19 @@ namespace JinxyMac.Engine;
 public sealed class MacHotkeyWatcher : IHotkeyWatcher
 {
     private CancellationTokenSource? _cts;
-    private Action<int, string>? _capture;
 
-    public bool IsAvailable => OperatingSystem.IsMacOS() && AXIsProcessTrusted();
+    // Written on the UI thread (CaptureNext) and read on the poll thread
+    // (Poll), the same shape as _watched below, and for the same reason: a
+    // plain field read here could observe a stale value for an unbounded
+    // time on another core, so the poll thread might keep matching against
+    // an already-cleared or already-set capture callback.
+    private volatile Action<int, string>? _capture;
+
+    public bool IsAvailable => OperatingSystem.IsMacOS() && IsTrusted();
 
     public string? Unavailable =>
         !OperatingSystem.IsMacOS() ? "Not running on macOS."
-        : AXIsProcessTrusted() ? null
+        : IsTrusted() ? null
         : "Accessibility permission is not granted, so hotkeys cannot be seen.";
 
     /// <summary>
@@ -56,13 +62,24 @@ public sealed class MacHotkeyWatcher : IHotkeyWatcher
     /// </remarks>
     public const int MouseBase = 1000;
 
+    /// <summary>
+    /// How many mouse codes exist above MouseBase. Matches the `down` array
+    /// in Poll exactly (sized MouseBase + MouseCodeCount) — Bindable is the
+    /// gate that array's indexing relies on, so the two must agree. Wider
+    /// than the two buttons actually offered for binding (MouseBase + 3 and
+    /// + 4) to leave room without meaning "any code at all": a stored code at
+    /// or past MouseBase + MouseCodeCount is not a mouse code this watcher
+    /// can represent, hand-edited settings file or not.
+    /// </summary>
+    private const int MouseCodeCount = 8;
+
     public void Watch(IEnumerable<int> codes) =>
         _watched = codes.Where(Bindable).Distinct().ToArray();
 
     private static bool Bindable(int code) =>
         code is >= 0 and < 128 || IsMouse(code);
 
-    private static bool IsMouse(int code) => code >= MouseBase;
+    private static bool IsMouse(int code) => code is >= MouseBase and < MouseBase + MouseCodeCount;
 
     /// <summary>Whether a key or button is down right now, whichever it is.</summary>
     private static bool Held(int code) =>
@@ -96,7 +113,7 @@ public sealed class MacHotkeyWatcher : IHotkeyWatcher
     {
         // Sized for the mouse codes as well as the keys, so one array indexes
         // both without a second lookup.
-        var down = new bool[MouseBase + 8];
+        var down = new bool[MouseBase + MouseCodeCount];
 
         // The side buttons only. Left is the button this app is busy
         // synthesising and binding it would be a loop; right and middle are
@@ -222,6 +239,25 @@ public sealed class MacHotkeyWatcher : IHotkeyWatcher
     };
 
     public void Dispose() => Stop();
+
+    /// <summary>
+    /// Same guard as MacClickEngine.IsTrusted and MacKeyEngine.IsTrusted: a
+    /// missing native framework (this DllImport resolves lazily, on first
+    /// call) throws DllNotFoundException, and unlike those two call sites,
+    /// IsAvailable and Unavailable here are read straight from UI code with
+    /// nothing above them to catch it.
+    /// </summary>
+    private static bool IsTrusted()
+    {
+        try
+        {
+            return AXIsProcessTrusted();
+        }
+        catch
+        {
+            return false;
+        }
+    }
 
     private const int PollMs = 8;
     private const uint HidSystemState = 1;
