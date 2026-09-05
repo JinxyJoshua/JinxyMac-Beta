@@ -129,7 +129,7 @@ public partial class MainWindow : Window
         // Config first, so anything it turns off is off before the update
         // prompt or any feature has had a chance to run. Fire and forget: the
         // shipped defaults are already in force, and nothing waits on this.
-        _ = RemoteConfig.LoadAsync(CancellationToken.None);
+        _ = LoadRemoteConfig();
 
         // Quietly, and only if asked for. Nothing is downloaded without a press.
         if (_settings.AutoCheckUpdates) _ = CheckForUpdate(announce: false);
@@ -269,6 +269,38 @@ public partial class MainWindow : Window
 
         PermissionReasonText.Text = _engine.Unavailable
             ?? "Clicks are not reaching the system.";
+    }
+
+    /// <summary>
+    /// Fetches the remote config, then re-renders whatever it changed.
+    /// </summary>
+    /// <remarks>
+    /// Split from <see cref="RemoteConfig.LoadAsync"/> itself only so this
+    /// window can repaint once the fetch lands — the config is fire-and-forget
+    /// and nothing else waits on it.
+    /// </remarks>
+    private async Task LoadRemoteConfig()
+    {
+        await RemoteConfig.LoadAsync(CancellationToken.None);
+
+        RefreshNotice();
+    }
+
+    /// <summary>
+    /// Shows the remote notice line, or nothing at all.
+    /// </summary>
+    /// <remarks>
+    /// Displayed only. It is never parsed, never treated as a link or a path
+    /// — <see cref="RemoteConfig"/> already caps its length, and the rest of
+    /// the safety here is simply that this is the only thing ever done with
+    /// it: assigned to a TextBlock's Text.
+    /// </remarks>
+    private void RefreshNotice()
+    {
+        string notice = RemoteConfig.Current.Notice;
+
+        NoticeText.Text = notice;
+        NoticeText.IsVisible = notice.Length > 0;
     }
 
     /// <summary>
@@ -1641,11 +1673,31 @@ public partial class MainWindow : Window
         RecordError.IsVisible = true;
     }
 
+    /// <summary>
+    /// Shown wherever a start is refused because <see cref="RemoteConfig"/>
+    /// switched the recorder off. Said plainly rather than as a generic
+    /// "unavailable" — this is a deliberate remote kill, not a local fault,
+    /// and the wording should not send anyone hunting for one.
+    /// </summary>
+    private const string RecorderDisabledMessage =
+        "Recording has been switched off remotely because it was found broken. "
+        + "It will come back once that is fixed — no update needed.";
+
     private async Task ToggleRecording()
     {
         RecordError.IsVisible = false;
 
-        if (!_recorder.IsRecording) WarnIfCaptureBlocked();
+        if (!_recorder.IsRecording)
+        {
+            if (!RemoteConfig.Current.RecorderEnabled)
+            {
+                RecordError.Text = RecorderDisabledMessage;
+                RecordError.IsVisible = true;
+                return;
+            }
+
+            WarnIfCaptureBlocked();
+        }
 
         RecordButton.IsEnabled = false;
 
@@ -1731,6 +1783,20 @@ public partial class MainWindow : Window
     private void RefreshReplay()
     {
         bool wanted = ReplayEnabled.IsChecked == true;
+
+        // The remote kill switch covers the buffer too — it re-encodes the
+        // screen for the whole session, which is exactly the kind of thing a
+        // broken ffmpeg or Screen Recording setup turns into a crash loop.
+        if (wanted && !_replay.IsRunning && !RemoteConfig.Current.RecorderEnabled)
+        {
+            ReplayStatusText.Text = RecorderDisabledMessage;
+
+            _loading = true;
+            ReplayEnabled.IsChecked = false;
+            _loading = false;
+
+            return;
+        }
 
         // Same permission, same silent failure — a buffer full of black frames
         // is worse than one that never started, because it looks like it works

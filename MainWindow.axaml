@@ -286,6 +286,14 @@
                     <!-- Clicker -->
                     <StackPanel Name="PageClicker">
 
+                        <!-- A short remote line, e.g. "known issue, fix coming".
+                             Empty means nothing shown — not an empty gap.
+                             Displayed only: never parsed, never a link, never
+                             a path. -->
+                        <TextBlock Name="NoticeText" Classes="hint" IsVisible="False"
+                                   Foreground="{DynamicResource Accent}" TextWrapping="Wrap"
+                                   Margin="0,0,0,14"/>
+
                         <!-- Shown when macOS is refusing to deliver the clicks.
                              This is the failure that looks like a broken app:
                              everything runs, the counter counts, and nothing
