@@ -105,4 +105,33 @@ public static class SwitcherMacro
 
         return new Result(macro, null, firstHold, raised);
     }
+
+    /// <summary>
+    /// The key codes the two slots would send, parsed from whatever is
+    /// currently typed — independent of whether the hold times or equip
+    /// delay are valid, since this exists only to answer "would the switcher
+    /// ever send this key".
+    /// </summary>
+    /// <remarks>
+    /// Used from the fixed hotkeys' own rebind check
+    /// (<c>MainWindow.axaml.cs</c>'s <c>Bind</c>), which has to refuse a code
+    /// these slots already send — the same reason it refuses a code a macro
+    /// sends (see <see cref="MacroStore.FindByKey"/>) — even before the
+    /// switcher has ever been started: its slots are just two text boxes,
+    /// not a <see cref="KeyMacro"/> at rest (see this type's own remarks),
+    /// so nothing stores them anywhere <c>Bind</c> could otherwise have
+    /// looked.
+    ///
+    /// A slot that doesn't parse (empty, or more than one letter or digit)
+    /// contributes nothing rather than failing — it isn't a key yet, so it
+    /// can't collide with one.
+    /// </remarks>
+    public static IEnumerable<int> SlotKeys(string? slotA, string? slotB)
+    {
+        if (MacroStore.ParseKeys(slotA) is (int[] keysA, _))
+            foreach (int key in keysA) yield return key;
+
+        if (MacroStore.ParseKeys(slotB) is (int[] keysB, _))
+            foreach (int key in keysB) yield return key;
+    }
 }

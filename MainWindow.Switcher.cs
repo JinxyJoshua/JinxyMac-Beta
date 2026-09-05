@@ -100,10 +100,11 @@ public partial class MainWindow
         // would say Enable while the hotkey still started it.
         if (_switcherDisabled) return;
 
-        // Same guard the fixed hotkeys and macro toggles carry: bound to a
+        // Same shared guard Fire and ToggleMacroHotkey carry (see
+        // TypingInThisWindow's remarks in MainWindow.axaml.cs): bound to a
         // digit, this would otherwise fire while the slot boxes on this very
         // page are being typed into.
-        if (IsActive && TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() is TextBox) return;
+        if (TypingInThisWindow()) return;
 
         SwitcherEnabled.IsChecked = SwitcherEnabled.IsChecked != true;
     }
@@ -208,6 +209,19 @@ public partial class MainWindow
         if (result.Macro == null)
         {
             SwitcherStatusText.Text = result.Error ?? "Could not build the switcher.";
+            RefreshSwitcherCard();
+            return;
+        }
+
+        // Symmetric with Bind()'s own refusal to give a fixed hotkey one of
+        // these slots' keys: Fire() tries the fixed hotkeys first, so
+        // starting the switcher on a code one of them already owns would
+        // leave it silently dead on that slot.
+        if (FixedHotkeyClash(result.Macro.Keys) is (string slotClashAction, string slotClashName))
+        {
+            SwitcherStatusText.Text =
+                $"{slotClashName} is already the {slotClashAction} key. Change that slot, "
+                + $"or free up the {slotClashAction} hotkey first.";
             RefreshSwitcherCard();
             return;
         }

@@ -628,6 +628,39 @@ public sealed class MacroRunner : IDisposable
     }
 
     public void Dispose() => StopAll();
+
+    /// <summary>
+    /// Why a hotkey capture must not begin right now, or null when it's safe
+    /// to start one.
+    /// </summary>
+    /// <remarks>
+    /// Both platform watchers (<c>Engine.MacHotkeyWatcher</c> and
+    /// <c>Engine.WindowsHotkeyWatcher</c>) capture a rebind by scanning raw
+    /// key state, with no notion of what a macro is — they see this app's
+    /// own synthetic presses exactly as they would a real one. With a macro
+    /// (or the switcher, which is one under the hood — see
+    /// <see cref="SwitcherMacro"/>) running, the very next key it sends would
+    /// be captured as the new binding instead of whatever the user meant to
+    /// press, and nothing would look wrong on screen until that "bound" key
+    /// turned out to be one <c>Fire</c>'s own <see cref="RunningKeys"/> guard
+    /// refuses forever.
+    ///
+    /// Refusing outright rather than filtering running macros' own codes out
+    /// of the scan: a filter would have to keep re-reading which codes are
+    /// live as macros start and stop mid-capture, and would still let
+    /// someone bind a key one macro sends while a different, unrelated
+    /// macro happens to be running — a narrower rule that is harder to
+    /// explain than "stop your macros first", for a capture that takes at
+    /// most a keypress to finish.
+    /// </remarks>
+    public static string? CaptureBlockedReason(int runningMacroCount) => runningMacroCount switch
+    {
+        <= 0 => null,
+        1 => "A macro is running. Stop it before rebinding a hotkey — "
+             + "its own key presses would be captured as the new binding.",
+        _ => $"{runningMacroCount} macros are running. Stop them before rebinding a hotkey — "
+             + "their own key presses would be captured as the new binding."
+    };
 }
 
 /// <summary>
@@ -883,6 +916,59 @@ public static class MacroStore
     /// </remarks>
     public static KeyMacro? FindByHotkeyCode(IEnumerable<KeyMacro> macros, int code, KeyMacro? excluding = null) =>
         macros.FirstOrDefault(m => !ReferenceEquals(m, excluding) && m.Hotkey.IsValid && m.Hotkey.Code == code);
+
+    /// <summary>The macro that sends this key among its own, or null when none does.</summary>
+    /// <remarks>
+    /// The other half of <see cref="FindByHotkeyCode"/>: that finds who owns a
+    /// code as a *toggle*, this finds who owns it as one of the keys the
+    /// macro actually *sends*. Both matter to the same collision — a fixed
+    /// hotkey rebound onto a key a macro sends would be swallowed the
+    /// instant that macro runs, by the same <c>RunningKeys</c> guard
+    /// <c>MainWindow.axaml.cs</c>'s <c>Fire</c> already applies — so
+    /// <c>Bind</c> has to refuse this symmetrically with
+    /// <see cref="FindByHotkeyCode"/>, the same way it already refuses a
+    /// code a macro's toggle owns.
+    ///
+    /// Disabled macros included, for the same reason
+    /// <see cref="FindByHotkeyCode"/> includes them: a disabled macro's keys
+    /// are still its own, and letting a fixed hotkey take one only to
+    /// collide the moment it is re-enabled is not a fix.
+    /// </remarks>
+    public static KeyMacro? FindByKey(IEnumerable<KeyMacro> macros, int code) =>
+        macros.FirstOrDefault(m => m.Keys.Contains(code));
+
+    /// <summary>
+    /// Which fixed hotkey, if any, already owns one of these key codes.
+    /// </summary>
+    /// <remarks>
+    /// The reverse direction of <see cref="FindByKey"/> and
+    /// <see cref="FindByHotkeyCode"/>: those answer "does a macro or the
+    /// switcher already send this code", asked from <c>Bind</c>'s side; this
+    /// answers "does a fixed hotkey already own one of the codes I am about
+    /// to save", asked from <c>SaveMacro</c>'s and <c>RefreshSwitcher</c>'s
+    /// side. The same symmetry matters here: <c>Fire</c> tries the fixed
+    /// hotkeys before it ever looks at a macro or the switcher, so a macro
+    /// or a switcher slot saved onto a code a fixed hotkey already owns
+    /// would never fire — the fixed hotkey wins every time, silently.
+    /// </remarks>
+    /// <param name="codes">The codes about to be saved — a macro's parsed Keys, or the switcher's two slots.</param>
+    /// <param name="bindings">
+    /// The fixed hotkeys as <c>MainWindow.axaml.cs</c>'s own <c>Bindings()</c>
+    /// reports them: one (action, code, display name) triple per fixed
+    /// hotkey.
+    /// </param>
+    public static (string Action, string Name)? FindFixedHotkeyClash(
+        IEnumerable<int> codes, IEnumerable<(string Action, int Code, string Name)> bindings)
+    {
+        var set = new HashSet<int>(codes);
+
+        foreach ((string action, int code, string name) in bindings)
+        {
+            if (code >= 0 && set.Contains(code)) return (action, name);
+        }
+
+        return null;
+    }
 
     /// <summary>
     /// Whether this toggle hotkey is one of the keys the macro itself sends —

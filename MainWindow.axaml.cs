@@ -192,6 +192,13 @@ public partial class MainWindow : Window
 
         Closed += (_, _) =>
         {
+            // First, before anything it reads gets disposed below: _stats is
+            // the one timer this handler used to leave running, and its own
+            // tick reads _clicker — which the last statement here disposes.
+            // _kitRollTicker and _macroBadgeTicker are already stopped
+            // elsewhere in this same handler; this was the one left out.
+            _stats.Stop();
+
             Persist();
             FlushHistory();
 
@@ -871,6 +878,24 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
+    /// True while this window is the one with focus and the caret is
+    /// sitting in one of its own text boxes.
+    /// </summary>
+    /// <remarks>
+    /// The one guard every hotkey handler needs, shared here rather than
+    /// copied a third time — which is how it went missing in the first
+    /// place: <see cref="ToggleMacroHotkey"/> and
+    /// <see cref="ToggleSwitcherHotkey"/> each wrote their own copy of this
+    /// check, and <see cref="Fire"/>, wired up separately, wrote none. A
+    /// hotkey watcher polls raw keyboard state system-wide with no notion
+    /// of what has focus, so typing a bound letter into a preset name, a
+    /// macro's own key box, the hex accent field — any TextBox in this
+    /// window — would otherwise fire it exactly like a real keypress.
+    /// </remarks>
+    private bool TypingInThisWindow() =>
+        IsActive && TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() is TextBox;
+
+    /// <summary>
     /// Runs whichever action the pressed key is bound to.
     /// </summary>
     /// <remarks>
@@ -879,9 +904,16 @@ public partial class MainWindow : Window
     /// the user's key and they may have meant it — but doing two things at once
     /// would not be what anyone meant.
     ///
-    /// A key any running macro is currently sending is refused before any of
-    /// that: on macOS the watcher reads key state off the same HID source
-    /// this app's own synthetic presses go through (see
+    /// Typing into one of this window's own text boxes is refused first —
+    /// see <see cref="TypingInThisWindow"/> — the same guard
+    /// <see cref="ToggleMacroHotkey"/> and <see cref="ToggleSwitcherHotkey"/>
+    /// already carried; without it here too, every one of the five fixed
+    /// hotkeys fired while typing a preset name, a macro's key, the hex
+    /// accent box or the clip folder.
+    ///
+    /// A key any running macro is currently sending is refused next: on
+    /// macOS the watcher reads key state off the same HID source this app's
+    /// own synthetic presses go through (see
     /// <c>MacHotkeyWatcher.Poll</c>'s remarks), so without this a macro
     /// cycling through a hotkey's own code — the switcher alternating 1 and 2
     /// while a clicker hotkey sits on 1, say — would retrigger that hotkey on
@@ -894,6 +926,7 @@ public partial class MainWindow : Window
         // like any other. Only a negative code — HotkeyBinding.Unbound's
         // sentinel — means nothing was pressed.
         if (code < 0) return;
+        if (TypingInThisWindow()) return;
         if (_macros.RunningKeys().Contains(code)) return;
 
         if (code == _settings.HotkeyCode)
@@ -922,10 +955,21 @@ public partial class MainWindow : Window
     /// Only the plain keybind holds. The combo and building keys stay toggles
     /// whatever the mode says — building especially, which is used while both
     /// hands are busy doing something else.
+    ///
+    /// Guarded against a running macro's own output the same way
+    /// <see cref="Fire"/> is, and for the same reason: the switcher
+    /// alternating its two slot keys sends its own key-up for whichever one
+    /// it just left, and without this check that synthetic release stopped
+    /// the clicker mid-hold — with a clicker hotkey and a switcher slot both
+    /// bound to the same key, the physical key was still down, but
+    /// <see cref="Fire"/>'s matching guard meant it could never be restarted
+    /// by pressing it again either.
     /// </remarks>
     private void Lifted(int code)
     {
-        if (code < 0 || code != _settings.HotkeyCode) return;
+        if (code < 0) return;
+        if (_macros.RunningKeys().Contains(code)) return;
+        if (code != _settings.HotkeyCode) return;
         if (HoldModeButton.IsChecked != true) return;
 
         if (_clicker.IsRunning) Toggle();
@@ -948,6 +992,19 @@ public partial class MainWindow : Window
         {
             if (_rebinding) return;
 
+            // A running macro's own output looks exactly like a keypress to
+            // whichever watcher is about to start scanning for one — see
+            // MacroRunner.CaptureBlockedReason's remarks. Refused before the
+            // button even enters "Press a key…" so nothing here has to be
+            // undone.
+            string? blocked = MacroRunner.CaptureBlockedReason(_macros.RunningCount);
+            if (blocked != null)
+            {
+                HotkeyNoticeText.Text = blocked;
+                HotkeyNoticeText.IsVisible = true;
+                return;
+            }
+
             _rebinding = true;
 
             object? previous = button.Content;
@@ -963,18 +1020,34 @@ public partial class MainWindow : Window
                 // run — which reads as a hotkey that quietly stopped working
                 // rather than as a clash, so it is refused by name instead.
                 //
-                // Checked against the macros' hotkeys too, not just the other
-                // four fixed ones: Fire()'s if/else-if chain tries these fixed
-                // hotkeys before it ever looks at a macro's, so a fixed key
-                // rebound onto a key a macro already owns would permanently
-                // shadow that macro — it would still look bound on its card
-                // and fire nothing. BindMacroHotkey already refuses the other
-                // direction; this is what makes the two agree.
+                // Checked against every other direction a key could already
+                // be spoken for, not just the other four fixed ones:
+                // Fire()'s if/else-if chain tries these fixed hotkeys before
+                // it ever looks at a macro or the switcher, so a fixed key
+                // rebound onto any of the following would permanently shadow
+                // it — it would still look bound and fire nothing:
+                //   - another macro's own toggle (FindByHotkeyCode) —
+                //     BindMacroHotkey already refuses the other direction,
+                //     this is what makes the two agree;
+                //   - the New Macro form's own pending pick, staged in
+                //     _pendingNewMacroHotkey and invisible to
+                //     FindByHotkeyCode until Save bakes it into a real
+                //     KeyMacro;
+                //   - a key a macro actually sends (FindByKey), the same
+                //     collision Fire()'s own RunningKeys() guard exists to
+                //     catch, just approached from the binding side instead
+                //     of the firing side;
+                //   - one of the switcher's two slots (SlotKeys), which is
+                //     never a KeyMacro at rest and so has nothing in
+                //     _macroList for FindByKey to find.
                 string? taken = Bindings()
                     .Where(b => b.Code == code && b.Action != action)
                     .Select(b => b.Action)
                     .FirstOrDefault()
-                    ?? MacroStore.FindByHotkeyCode(_macroList, code)?.Name;
+                    ?? MacroStore.FindByHotkeyCode(_macroList, code)?.Name
+                    ?? (_pendingNewMacroHotkey.IsValid && _pendingNewMacroHotkey.Code == code ? "new macro" : null)
+                    ?? MacroStore.FindByKey(_macroList, code)?.Name
+                    ?? (SwitcherMacro.SlotKeys(SlotABox.Text, SlotBBox.Text).Contains(code) ? "Auto Switcher" : null);
 
                 if (taken != null)
                 {
@@ -993,6 +1066,21 @@ public partial class MainWindow : Window
             }));
         };
     }
+
+    /// <summary>Which fixed hotkey, if any, already owns one of these key codes.</summary>
+    /// <remarks>
+    /// The reverse of <c>Bind</c>'s own check above: used from
+    /// <c>MainWindow.Macros.cs</c>'s <c>SaveMacro</c> and
+    /// <c>MainWindow.Switcher.cs</c>'s <c>RefreshSwitcher</c>, which have to
+    /// refuse the keys they are about to save (or the resolved toggle
+    /// hotkey, for <c>SaveMacro</c>) landing on a code a fixed hotkey already
+    /// owns — see <see cref="MacroStore.FindFixedHotkeyClash"/> for why the
+    /// symmetry matters. Thin on purpose: the actual matching is pure and
+    /// lives in Core where it can be tested; this just hands it
+    /// <see cref="Bindings"/>, which cannot leave this window.
+    /// </remarks>
+    private (string Action, string Name)? FixedHotkeyClash(IEnumerable<int> codes) =>
+        MacroStore.FindFixedHotkeyClash(codes, Bindings());
 
     /// <summary>
     /// Every binding, with the action it belongs to.
@@ -1646,6 +1734,22 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
+    /// True while a scan is already in flight, so a second call — the
+    /// launch-time <see cref="StartCapture"/> racing a press of the Rescan or
+    /// Recheck buttons — has something to check against.
+    /// </summary>
+    /// <remarks>
+    /// The unbounded <c>await</c> below (the comment on it explains why: a
+    /// Mac permission prompt has no deadline) is exactly the window a second
+    /// call could land in. Both calls would each clear <c>_screens</c> and
+    /// <c>DisplayPanel</c> and then <c>AddRange</c> whatever they found,
+    /// independently — the second clear racing the first call's still-running
+    /// <c>AddRange</c> is what duplicated the display list and left the wrong
+    /// index selected.
+    /// </remarks>
+    private bool _rescanning;
+
+    /// <summary>
     /// Asks ffmpeg what it can capture from, and says so plainly when the answer
     /// is nothing.
     /// </summary>
@@ -1663,67 +1767,77 @@ public partial class MainWindow : Window
     /// </remarks>
     private async Task RescanScreens()
     {
-        DisplayPanel.Children.Clear();
-        _screens.Clear();
+        if (_rescanning) return;
+        _rescanning = true;
 
-        string? ffmpeg = Ffmpeg.Find();
-
-        if (ffmpeg == null)
+        try
         {
-            ScreenNote.Text = $"ffmpeg was not found. Install it with:  {Ffmpeg.InstallHint}";
-            BackendDetail.Text = "No encoder — ffmpeg is missing.";
+            DisplayPanel.Children.Clear();
+            _screens.Clear();
 
-            // Left clickable on purpose. Greying these out meant the tester met
-            // a checkbox that would not tick and said nothing about why — the
-            // reason was on a different card, and a control that refuses to be
-            // touched teaches nothing. Pressed now, each one fails with the
-            // command that fixes it.
-            ReplayNoteText.Text = $"Needs ffmpeg, which is not installed. {Ffmpeg.InstallHint}";
-            ReplayNoteText.IsVisible = true;
+            string? ffmpeg = Ffmpeg.Find();
 
-            FfmpegCommandText.Text = Ffmpeg.InstallHint;
-            FfmpegBanner.IsVisible = true;
-            ShowInstallStep();
+            if (ffmpeg == null)
+            {
+                ScreenNote.Text = $"ffmpeg was not found. Install it with:  {Ffmpeg.InstallHint}";
+                BackendDetail.Text = "No encoder — ffmpeg is missing.";
 
-            return;
+                // Left clickable on purpose. Greying these out meant the tester met
+                // a checkbox that would not tick and said nothing about why — the
+                // reason was on a different card, and a control that refuses to be
+                // touched teaches nothing. Pressed now, each one fails with the
+                // command that fixes it.
+                ReplayNoteText.Text = $"Needs ffmpeg, which is not installed. {Ffmpeg.InstallHint}";
+                ReplayNoteText.IsVisible = true;
+
+                FfmpegCommandText.Text = Ffmpeg.InstallHint;
+                FfmpegBanner.IsVisible = true;
+                ShowInstallStep();
+
+                return;
+            }
+
+            ReplayNoteText.IsVisible = false;
+            FfmpegBanner.IsVisible = false;
+            ScreenNote.Text = "Looking…";
+
+            (List<CaptureDevice> found, string encoder) = await Task.Run(() =>
+                (CaptureBackend.Screens(ffmpeg), CaptureBackend.EncoderArgs(ffmpeg)));
+
+            _screens.AddRange(found);
+
+            foreach (CaptureDevice screen in _screens) DisplayPanel.Children.Add(ScreenButton(screen));
+
+            if (_screens.Count > 0)
+            {
+                // Falls back to the first rather than leaving nothing chosen, so
+                // Record always has something to capture.
+                CaptureDevice wanted = _screens.FirstOrDefault(s => s.Index == _settings.RecordScreen)
+                                       ?? _screens[0];
+
+                _screen = wanted;
+                ((RadioButton)DisplayPanel.Children[_screens.IndexOf(wanted)]).IsChecked = true;
+
+                ScreenNote.Text = "";
+            }
+            else
+            {
+                _screen = null;
+
+                ScreenNote.Text = OperatingSystem.IsMacOS()
+                    ? "No screens listed. macOS hides them until Screen Recording permission is granted — "
+                      + "System Settings > Privacy & Security > Screen Recording."
+                    : "Screen enumeration is a macOS path. On Windows this records the whole desktop.";
+            }
+
+            BackendDetail.Text =
+                $"{(OperatingSystem.IsMacOS() ? "avfoundation" : "gdigrab")}"
+                + $"  ·  {CaptureBackend.EncoderName ?? encoder}  ·  {ffmpeg}";
         }
-
-        ReplayNoteText.IsVisible = false;
-        FfmpegBanner.IsVisible = false;
-        ScreenNote.Text = "Looking…";
-
-        (List<CaptureDevice> found, string encoder) = await Task.Run(() =>
-            (CaptureBackend.Screens(ffmpeg), CaptureBackend.EncoderArgs(ffmpeg)));
-
-        _screens.AddRange(found);
-
-        foreach (CaptureDevice screen in _screens) DisplayPanel.Children.Add(ScreenButton(screen));
-
-        if (_screens.Count > 0)
+        finally
         {
-            // Falls back to the first rather than leaving nothing chosen, so
-            // Record always has something to capture.
-            CaptureDevice wanted = _screens.FirstOrDefault(s => s.Index == _settings.RecordScreen)
-                                   ?? _screens[0];
-
-            _screen = wanted;
-            ((RadioButton)DisplayPanel.Children[_screens.IndexOf(wanted)]).IsChecked = true;
-
-            ScreenNote.Text = "";
+            _rescanning = false;
         }
-        else
-        {
-            _screen = null;
-
-            ScreenNote.Text = OperatingSystem.IsMacOS()
-                ? "No screens listed. macOS hides them until Screen Recording permission is granted — "
-                  + "System Settings > Privacy & Security > Screen Recording."
-                : "Screen enumeration is a macOS path. On Windows this records the whole desktop.";
-        }
-
-        BackendDetail.Text =
-            $"{(OperatingSystem.IsMacOS() ? "avfoundation" : "gdigrab")}"
-            + $"  ·  {CaptureBackend.EncoderName ?? encoder}  ·  {ffmpeg}";
     }
 
     /// <summary>
@@ -3041,12 +3155,24 @@ public partial class MainWindow : Window
     /// <summary>
     /// Lists every binding in one place, since they are set from three pages.
     /// </summary>
+    /// <remarks>
+    /// "Every binding" includes macro toggle hotkeys, not only the fixed six
+    /// <see cref="Bindings"/> reports — they share the same collision
+    /// namespace (see <c>Bind</c>'s and <c>SaveMacro</c>'s symmetric checks
+    /// against <see cref="MacroStore.FindByHotkeyCode"/>), so a summary that
+    /// silently left them out was not living up to its own doc comment.
+    /// </remarks>
     private void RefreshHotkeySummary()
     {
-        string[] bound = Bindings()
+        IEnumerable<string> fixedBound = Bindings()
             .Where(b => b.Code >= 0)
-            .Select(b => $"{b.Action}: {b.Name}")
-            .ToArray();
+            .Select(b => $"{b.Action}: {b.Name}");
+
+        IEnumerable<string> macroBound = _macroList
+            .Where(m => m.Hotkey.IsValid)
+            .Select(m => $"{m.Name}: {m.Hotkey.Name}");
+
+        string[] bound = fixedBound.Concat(macroBound).ToArray();
 
         HotkeySummaryText.Text = bound.Length == 0
             ? "Nothing bound yet. The buttons are on the Clicker and Recorder pages."
@@ -3117,26 +3243,58 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Names the files that exist, so Reset says what it will remove.</summary>
+    /// <remarks>
+    /// <c>macros.json</c> and <c>kit_wheel.json</c> deliberately are not in
+    /// the removed list — see <see cref="ResetEverything"/>'s remarks for
+    /// why — but a file list that silently left them off entirely was
+    /// exactly the kind of quiet gap the rest of this app's hotkey
+    /// collision checks exist to avoid. Named here too, so the choice is
+    /// something the UI actually says rather than something only this
+    /// method's own diff would ever have shown.
+    /// </remarks>
     private void RefreshStoredFiles()
     {
-        string[] files = { "settings.json", "click_presets.json", "history.json" };
+        string[] resetByReset = { "settings.json", "click_presets.json", "history.json" };
+        string[] keptAcrossReset = { "macros.json", "kit_wheel.json" };
 
-        string[] present = files
-            .Where(f => File.Exists(System.IO.Path.Combine(SettingsPath.Folder, f)))
-            .ToArray();
+        string[] present = resetByReset.Where(Exists).ToArray();
+        string[] kept = keptAcrossReset.Where(Exists).ToArray();
 
-        StoredFilesText.Text = present.Length == 0
+        string line = present.Length == 0
             ? "Nothing written yet."
             : "Holding " + string.Join(", ", present) + ".";
+
+        if (kept.Length > 0)
+        {
+            line += "  Also holding " + string.Join(" and ", kept)
+                  + " — Reset settings leaves your macros and kit wheel roster alone.";
+        }
+
+        StoredFilesText.Text = line;
+
+        bool Exists(string file) => File.Exists(System.IO.Path.Combine(SettingsPath.Folder, file));
     }
 
     /// <summary>
-    /// Deletes every stored file and returns the window to its defaults.
+    /// Deletes the stored settings files and returns the window to its
+    /// defaults.
     /// </summary>
     /// <remarks>
     /// Reloads into the live controls rather than asking for a restart. The
     /// settings are all already bound to something on screen, so a restart would
     /// only be a way of avoiding the work.
+    ///
+    /// Deliberately does not touch <c>macros.json</c> or <c>kit_wheel.json</c>,
+    /// even though the button beside it is labelled "Reset settings" rather
+    /// than "reset everything": those two files hold things somebody built —
+    /// a macro typed in by hand, a kit-wheel roster picked one champion at a
+    /// time — not settings a slider or a checkbox already shows on screen.
+    /// Deleting them here would also mean stopping whatever macro or
+    /// switcher is currently running against a list this method is about to
+    /// erase out from under it, which is exactly the kind of teardown this
+    /// method has no reason to take on. <see cref="RefreshStoredFiles"/> and
+    /// the Settings page's own hint both say so explicitly, rather than
+    /// leaving two files nobody asked about to survive silently.
     /// </remarks>
     private void ResetEverything()
     {

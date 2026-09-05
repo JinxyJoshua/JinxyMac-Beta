@@ -1157,7 +1157,7 @@
 
                                 <TextBlock Name="ResetHint" Classes="hint" IsVisible="False"
                                            Foreground="{DynamicResource Accent}"
-                                           Text="This clears rates, hotkeys, presets, theme and click history. Clips on disk are untouched."/>
+                                           Text="This clears rates, hotkeys, presets, theme and click history. Clips, macros and your kit wheel roster are untouched."/>
                             </StackPanel>
                         </Border>
 

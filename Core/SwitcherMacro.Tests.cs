@@ -118,4 +118,33 @@ public class SwitcherMacroTests
         Assert.Equal(SwitcherMacro.ClicksWanted, result.Macro!.ClicksWanted);
         Assert.Equal(60, result.Macro.EquipMs);
     }
+
+    // ---- what the slots would send, before the switcher is ever built ----
+    //
+    // MainWindow.axaml.cs's Bind() has to refuse giving a fixed hotkey a code
+    // the switcher's two slots already claim, even before the switcher has
+    // ever been started — its slots are just two text boxes, never a KeyMacro
+    // at rest, so SlotKeys is what lets that check see them at all.
+
+    [Fact]
+    public void SlotKeysReportsBothSlots()
+    {
+        int[] keys = SwitcherMacro.SlotKeys("3", "1").ToArray();
+
+        Assert.Equal(new[] { KeyCodes.For('3')!.Value, KeyCodes.For('1')!.Value }, keys);
+    }
+
+    [Fact]
+    public void SlotKeysSkipsASlotThatDoesNotParse()
+    {
+        int[] keys = SwitcherMacro.SlotKeys("", "1").ToArray();
+
+        Assert.Equal(new[] { KeyCodes.For('1')!.Value }, keys);
+    }
+
+    [Fact]
+    public void SlotKeysIsEmptyWhenNeitherSlotParses()
+    {
+        Assert.Empty(SwitcherMacro.SlotKeys(null, "!"));
+    }
 }

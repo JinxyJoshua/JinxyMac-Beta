@@ -106,16 +106,18 @@ public partial class MainWindow
     /// the poll thread could be one generation stale by the time this runs.
     ///
     /// Guarded against this window's own text boxes the same way the Windows
-    /// build's <c>OnMacroHotkey</c> is: a letter typed into the KEY box while
-    /// this window is focused must not also toggle a macro bound to that
-    /// letter. It does not — and cannot — guard against the same collision in
-    /// some other app, because the watcher polls system-wide independently of
-    /// focus; that risk is inherent to a global hotkey and not specific to
-    /// macros.
+    /// build's <c>OnMacroHotkey</c> is, via the same
+    /// <see cref="TypingInThisWindow"/> check <c>Fire</c> and
+    /// <see cref="ToggleSwitcherHotkey"/> share: a letter typed into the KEY
+    /// box while this window is focused must not also toggle a macro bound
+    /// to that letter. It does not — and cannot — guard against the same
+    /// collision in some other app, because the watcher polls system-wide
+    /// independently of focus; that risk is inherent to a global hotkey and
+    /// not specific to macros.
     /// </remarks>
     private void ToggleMacroHotkey(KeyMacro macro)
     {
-        if (IsActive && TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() is TextBox) return;
+        if (TypingInThisWindow()) return;
 
         KeyMacro? current = _macroList.FirstOrDefault(m =>
             string.Equals(m.Name, macro.Name, StringComparison.OrdinalIgnoreCase));
@@ -169,6 +171,17 @@ public partial class MainWindow
     private void BindMacroHotkey(Button button, KeyMacro? macro)
     {
         if (_rebinding) return;
+
+        // Same guard the fixed hotkeys' own Bind carries: a running macro's
+        // output looks exactly like a keypress to whatever is about to
+        // start scanning for one. See MacroRunner.CaptureBlockedReason's
+        // remarks.
+        string? blocked = MacroRunner.CaptureBlockedReason(_macros.RunningCount);
+        if (blocked != null)
+        {
+            ShowMacroHotkeyNotice(blocked);
+            return;
+        }
 
         _rebinding = true;
 
@@ -328,6 +341,16 @@ public partial class MainWindow
             return;
         }
 
+        // Refused here, symmetric with Bind()'s own refusal to give a fixed
+        // hotkey a code these keys would send: Fire() tries the fixed
+        // hotkeys before it ever looks at a macro, so a macro saved onto one
+        // of their codes would never fire, with nothing on screen to say why.
+        if (FixedHotkeyClash(keys.Value.Keys) is (string keysClashAction, string keysClashName))
+        {
+            ShowMacroNotice($"{keysClashName} is already the {keysClashAction} key. Pick another key for the macro.");
+            return;
+        }
+
         // Saving under a name that is already taken is how editing works —
         // MacroStore.Upsert replaces the same-named macro wholesale. Found
         // *before* Upsert runs so the hotkey it would otherwise silently wipe
@@ -347,6 +370,31 @@ public partial class MainWindow
         {
             ShowMacroNotice(MacroStore.OwnKeyTrapMessage(hotkey.Name));
             return;
+        }
+
+        // The resolved hotkey re-checked against the same things
+        // BindMacroHotkey already checked when it was picked. Needed because
+        // ResolveSaveHotkey can carry a hotkey over from an existing
+        // same-named macro rather than only ever return what was just
+        // picked — a value that was free when it was chosen is not
+        // guaranteed to still be free now, and this is the one path a
+        // hotkey can reach a saved macro without ever passing through
+        // BindMacroHotkey's own check.
+        if (hotkey.IsValid)
+        {
+            string? fixedHolder = Bindings()
+                .Where(b => b.Code == hotkey.Code)
+                .Select(b => b.Action)
+                .FirstOrDefault();
+
+            string? holder = fixedHolder
+                ?? MacroStore.FindByHotkeyCode(_macroList, hotkey.Code, excluding: existing)?.Name;
+
+            if (holder != null)
+            {
+                ShowMacroNotice($"{hotkey.Name} is already the {holder} key. Pick another.");
+                return;
+            }
         }
 
         // Replacing a running macro would otherwise leave the old thread going

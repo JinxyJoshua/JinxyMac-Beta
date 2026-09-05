@@ -328,6 +328,87 @@ public class KeyMacroTests
         Assert.Same(macro, MacroStore.FindByHotkeyCode(macros, 99));
     }
 
+    // ---- who owns a key a macro actually sends ----
+    //
+    // FindByKey is FindByHotkeyCode's other half: that finds who owns a code
+    // as a toggle, this finds who owns it as one of the keys sent. Bind()
+    // (MainWindow.axaml.cs) has to refuse both directions symmetrically, or
+    // a fixed hotkey bound onto a key a macro sends would be swallowed the
+    // instant that macro runs (Fire()'s own RunningKeys() guard) with the
+    // fixed hotkey never firing again.
+
+    [Fact]
+    public void FindByKeyReturnsTheMacroThatSendsIt()
+    {
+        var macro = new KeyMacro("Switcher", new[] { 0x31, 0x32 }, "1, 2", 120);
+        var macros = new List<KeyMacro> { macro };
+
+        Assert.Same(macro, MacroStore.FindByKey(macros, 0x32));
+    }
+
+    [Fact]
+    public void FindByKeyReturnsNullWhenNoMacroSendsIt()
+    {
+        var macros = new List<KeyMacro> { new("Spam R", new[] { 0x52 }, "R", 120) };
+
+        Assert.Null(MacroStore.FindByKey(macros, 0x54));
+    }
+
+    /// <summary>
+    /// Mirrors <see cref="FindByHotkeyCodeMatchesADisabledMacroToo"/>: a
+    /// disabled macro's keys are still its own, not up for grabs.
+    /// </summary>
+    [Fact]
+    public void FindByKeyMatchesADisabledMacroToo()
+    {
+        var macro = new KeyMacro("Spam R", new[] { 0x52 }, "R", 120, enabled: false);
+        var macros = new List<KeyMacro> { macro };
+
+        Assert.Same(macro, MacroStore.FindByKey(macros, 0x52));
+    }
+
+    // ---- the reverse direction: does a fixed hotkey already own a code
+    // a macro or the switcher is about to send ----
+    //
+    // FindFixedHotkeyClash is what SaveMacro and RefreshSwitcher use to
+    // refuse the keys they are about to save landing on a code a fixed
+    // hotkey already owns — the same symmetry FindByKey exists for, asked
+    // from the other side.
+
+    private static readonly (string Action, int Code, string Name)[] SampleBindings =
+    {
+        ("clicker", 15, "R"),
+        ("building", -1, "Not set"),
+        ("switcher", 18, "1")
+    };
+
+    [Fact]
+    public void FindFixedHotkeyClashReturnsTheActionAndNameThatOwnTheCode()
+    {
+        (string Action, string Name)? clash = MacroStore.FindFixedHotkeyClash(new[] { 0x31, 15 }, SampleBindings);
+
+        Assert.True(clash is ("clicker", "R"));
+    }
+
+    [Fact]
+    public void FindFixedHotkeyClashReturnsNullWhenNothingCollides()
+    {
+        Assert.Null(MacroStore.FindFixedHotkeyClash(new[] { 0x31, 0x32 }, SampleBindings));
+    }
+
+    /// <summary>
+    /// An unbound fixed hotkey is stored at -1 (see
+    /// <see cref="HotkeyBinding.Unbound"/>), and a macro key can never be
+    /// negative (<see cref="KeyMacro"/>'s own constructor filters those out)
+    /// — but the clash check still has to skip it explicitly rather than
+    /// rely on that alone, since it is handed raw bindings, not macro keys.
+    /// </summary>
+    [Fact]
+    public void FindFixedHotkeyClashIgnoresAnUnboundFixedHotkey()
+    {
+        Assert.Null(MacroStore.FindFixedHotkeyClash(new[] { -1 }, SampleBindings));
+    }
+
     // ---- a toggle that would trap itself ----
     //
     // Fire() (MainWindow.axaml.cs) refuses any code a running macro's own

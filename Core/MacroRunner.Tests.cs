@@ -424,4 +424,42 @@ public class MacroRunnerTests
         Assert.True(events[0].Down);
         Assert.Equal(0x32, events[0].Code);
     }
+
+    // ---- guarding a rebind capture against a macro's own output ----
+    //
+    // Both platform hotkey watchers capture a rebind by scanning raw key
+    // state with no notion of what a macro is, so a running macro's own
+    // synthetic key would be captured as the new binding. CaptureBlockedReason
+    // is the refusal MainWindow.axaml.cs's Bind and MainWindow.Macros.cs's
+    // BindMacroHotkey both check before ever calling IHotkeyWatcher.CaptureNext.
+
+    [Fact]
+    public void CaptureBlockedReasonAllowsCapturingWhenNothingIsRunning()
+    {
+        Assert.Null(MacroRunner.CaptureBlockedReason(0));
+    }
+
+    [Fact]
+    public void CaptureBlockedReasonRefusesWhenOneMacroIsRunning()
+    {
+        string? reason = MacroRunner.CaptureBlockedReason(1);
+
+        Assert.NotNull(reason);
+        Assert.Contains("macro", reason);
+    }
+
+    [Fact]
+    public void CaptureBlockedReasonCountsHowManyAreRunning()
+    {
+        string? reason = MacroRunner.CaptureBlockedReason(3);
+
+        Assert.NotNull(reason);
+        Assert.Contains("3", reason);
+    }
+
+    [Fact]
+    public void CaptureBlockedReasonAllowsANegativeCountTheSameAsZero()
+    {
+        Assert.Null(MacroRunner.CaptureBlockedReason(-1));
+    }
 }
