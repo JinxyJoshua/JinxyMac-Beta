@@ -54,8 +54,9 @@
     <Compile Include="../Core/MacroRunner.Tests.cs" />
     <Compile Include="../Core/SwitcherMacro.cs" />
     <Compile Include="../Core/SwitcherMacro.Tests.cs" />
-    <!-- Pulled in as dependencies of the above, not tested directly. -->
     <Compile Include="../Core/SettingsPath.cs" />
+    <Compile Include="../Core/SettingsPath.Tests.cs" />
+    <!-- Pulled in as dependencies of the above, not tested directly. -->
     <Compile Include="../Capture/Ffmpeg.cs" />
     <Compile Include="../Core/Clicker.cs" />
     <Compile Include="../Core/Clicker.Tests.cs" />

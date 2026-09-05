@@ -305,23 +305,36 @@ public static class KitWheelStore
     /// </remarks>
     private static KitRoster Clean(KitRoster roster)
     {
+        // Any of these three can arrive null from a hand-edited file: System.Text.Json
+        // overwrites a property's initialiser with an explicit JSON null, so
+        // {"Kits":null} deserializes KitRoster.Kits to null despite the "= new()"
+        // above. Left unguarded, the foreach below throws, Load's catch turns that
+        // into Fresh(), and the very next tile click saves that fresh roster over
+        // the real one — quietly replacing the roster, the ticks, AND every saved
+        // wheel with defaults. Treating a null list here as an empty one keeps the
+        // damage to the one field that was actually null.
         var kits = new List<string>();
-        foreach (string kit in roster.Kits) KitWheel.Add(kits, kit);
+        foreach (string kit in roster.Kits ?? new List<string>()) KitWheel.Add(kits, kit);
 
+        List<string> selectedSource = roster.Selected ?? new List<string>();
         var selected = kits
-            .Where(k => roster.Selected.Any(s => s.Equals(k, StringComparison.OrdinalIgnoreCase)))
+            .Where(k => selectedSource.Any(s => s.Equals(k, StringComparison.OrdinalIgnoreCase)))
             .ToList();
 
         // Saved wheels are cleaned the same way, so a hand-edited file cannot
         // leave a preset naming kits the roster has never heard of.
         var presets = new List<KitPreset>();
 
-        foreach (KitPreset preset in roster.Presets)
+        foreach (KitPreset? preset in roster.Presets ?? new List<KitPreset>())
         {
+            // A null element (a hand-edited "presets":[null, {...}]) is
+            // skipped rather than crashing the whole load over one bad entry.
+            if (preset == null) continue;
+
             string? name = KitWheel.CleanName(preset.Name);
             if (name == null) continue;
 
-            List<string> allowed = KitWheel.ApplyPreset(kits, preset.Kits);
+            List<string> allowed = KitWheel.ApplyPreset(kits, preset.Kits ?? new List<string>());
             if (allowed.Count == 0) continue;
 
             KitWheel.SavePreset(presets, name, allowed);
@@ -334,7 +347,7 @@ public static class KitWheelStore
     {
         try
         {
-            File.WriteAllText(StoreFile, JsonSerializer.Serialize(roster));
+            SettingsPath.WriteAtomic(StoreFile, JsonSerializer.Serialize(roster));
         }
         catch
         {

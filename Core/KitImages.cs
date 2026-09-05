@@ -128,21 +128,53 @@ public static class KitImages
     {
         if (!IsSupported(sourcePath) || !File.Exists(sourcePath)) return null;
 
+        string? temp = null;
+
         try
         {
-            // Any earlier picture goes first, whatever format it was in, or a
-            // kit ends up with two and the one found depends on list order.
-            Remove(kit);
-
             string target = Path.Combine(Folder(),
                 FileNameFor(kit, Path.GetExtension(sourcePath).ToLowerInvariant()));
 
-            File.Copy(sourcePath, target, overwrite: true);
+            // Copying a file over itself throws. Re-picking the picture
+            // already stored for this kit is a no-op, not a failure — same
+            // guard Wallpaper.Store uses for the same reason.
+            if (string.Equals(Path.GetFullPath(sourcePath), Path.GetFullPath(target),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return target;
+            }
+
+            temp = target + ".tmp";
+
+            // Copied to a temporary name first, same reasoning as
+            // Wallpaper.Store: the old picture (Remove, below) must not be
+            // cleared until the new one is known good on disk. A copy that
+            // fails partway — the source on a share that disconnects, a full
+            // disk, the app killed in between — used to run Remove first and
+            // then fail the copy, leaving the kit with no picture in either
+            // extension. Doing the copy first means that failure now leaves
+            // the old picture exactly as it was.
+            File.Copy(sourcePath, temp, overwrite: true);
+
+            // Any earlier picture goes now, whatever format it was in, or a
+            // kit ends up with two and the one found depends on list order.
+            Remove(kit);
+            File.Move(temp, target, overwrite: true);
 
             return target;
         }
         catch
         {
+            try
+            {
+                if (temp != null && File.Exists(temp)) File.Delete(temp);
+            }
+            catch
+            {
+                // Best effort. A stray temp file is harmless — it is
+                // overwritten the next time one is stored.
+            }
+
             return null;
         }
     }

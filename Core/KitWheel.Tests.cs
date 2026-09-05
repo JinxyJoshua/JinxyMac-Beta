@@ -430,6 +430,127 @@ public class KitWheelTests
         Assert.Empty(KitWheelStore.Parse(json).Selected);
     }
 
+    /// <summary>
+    /// A hand-edited kit_wheel.json with <c>"Kits":null</c> deserializes
+    /// KitRoster.Kits to null despite its own field initialiser — System.Text.Json
+    /// overwrites an initialiser whenever the JSON carries an explicit null.
+    /// Parse used to throw on that (a bare foreach over a null list), which sent
+    /// Load's caller to Fresh() and replaced the roster, the ticks, AND every
+    /// saved wheel with the starter defaults, made permanent on the next tile
+    /// click. It must instead degrade to an empty roster — never crash, and
+    /// never silently substitute the full starter list.
+    /// </summary>
+    [Fact]
+    public void ANullKitsListParsesAsEmptyRatherThanCrashing()
+    {
+        KitRoster roster = KitWheelStore.Parse("""{"Kits":null,"Selected":["Zola"]}""");
+
+        Assert.Empty(roster.Kits);
+        Assert.NotEqual(KitWheel.StarterRoster().Count, roster.Kits.Count);
+    }
+
+    /// <summary>The same guard for the other two lists a hand-edited file can null out.</summary>
+    [Fact]
+    public void ANullSelectedOrPresetsListParsesAsEmptyRatherThanCrashing()
+    {
+        KitRoster roster = KitWheelStore.Parse(
+            """{"Kits":["Melody"],"Selected":null,"Presets":null}""");
+
+        Assert.Equal(new[] { "Melody" }, roster.Kits);
+        Assert.Empty(roster.Selected);
+        Assert.Empty(roster.Presets);
+    }
+
+    /// <summary>A null element inside "Presets" is skipped rather than crashing the whole load.</summary>
+    [Fact]
+    public void ANullPresetElementIsSkippedRatherThanCrashing()
+    {
+        KitRoster roster = KitWheelStore.Parse(
+            """{"Kits":["Melody","Ember"],"Selected":[],"Presets":[null,{"Name":"Ok","Kits":["Melody"]}]}""");
+
+        KitPreset only = Assert.Single(roster.Presets);
+        Assert.Equal("Ok", only.Name);
+    }
+
+    // ---- reading and writing the real file ----
+    //
+    // KitWheelStore.Load/Save read and write a fixed path (SettingsPath.For
+    // ("kit_wheel.json")), same as MacroStore and AppSettings — see those
+    // Tests.cs files for the backup/restore isolation this reuses.
+
+    private static string StoreFilePath => SettingsPath.For("kit_wheel.json");
+
+    /// <summary>
+    /// A zero-length file — exactly what a force-quit mid-write used to leave
+    /// behind before writes went through SettingsPath.WriteAtomic — must load
+    /// as the fresh-install defaults rather than throwing.
+    /// </summary>
+    [Fact]
+    public void AZeroLengthFileLoadsAsFreshRatherThanCrashing()
+    {
+        WithStoreFile("", () =>
+        {
+            KitRoster loaded = KitWheelStore.Load();
+
+            Assert.Equal(KitWheel.StarterRoster().Count, loaded.Kits.Count);
+            Assert.Empty(loaded.Selected);
+        });
+    }
+
+    /// <summary>
+    /// Save() must leave the previous file exactly as it was when the write
+    /// fails partway — the same contract SettingsPath.WriteAtomic.Tests.cs
+    /// pins directly, exercised here through the real caller.
+    /// </summary>
+    [Fact]
+    public void AFailedSaveLeavesThePreviousRosterFileIntact()
+    {
+        WithStoreFile("""{"Kits":["Melody"],"Selected":["Melody"],"Presets":[]}""", () =>
+        {
+            string temp = StoreFilePath + ".tmp";
+
+            // Block the rename by putting a directory where the temp file
+            // needs to land, so File.Move throws partway through Save.
+            Directory.CreateDirectory(temp);
+
+            try
+            {
+                KitWheelStore.Save(new KitRoster { Kits = new List<string> { "Somebody Else" } });
+
+                string raw = File.ReadAllText(StoreFilePath);
+                Assert.Contains("Melody", raw);
+                Assert.DoesNotContain("Somebody Else", raw);
+            }
+            finally
+            {
+                if (Directory.Exists(temp)) Directory.Delete(temp, recursive: true);
+            }
+        });
+    }
+
+    /// <summary>
+    /// Backs up whatever is at the real kit_wheel.json and restores it
+    /// afterwards — the isolation pattern <c>AppSettings.Tests.cs</c> and
+    /// <c>KeyMacro.Tests.cs</c> use for their own fixed-path files.
+    /// </summary>
+    private static void WithStoreFile(string? json, Action assertion)
+    {
+        string path = StoreFilePath;
+        bool existed = File.Exists(path);
+        string? original = existed ? File.ReadAllText(path) : null;
+
+        try
+        {
+            if (json != null) File.WriteAllText(path, json);
+            assertion();
+        }
+        finally
+        {
+            if (existed) File.WriteAllText(path, original!);
+            else if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
     // ---- searching the roster ----
 
     private static readonly List<string> Sample =

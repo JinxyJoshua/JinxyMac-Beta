@@ -225,7 +225,16 @@ public partial class MainWindow
             return;
         }
 
-        KitAddHintText.Text = name == null ? "Type a kit name" : "Already on the roster";
+        // KitWheel.Add returns false for two different reasons — a duplicate
+        // name, or a roster already at MaxKits — and they need different
+        // messages: telling someone who just hit the cap that their kit is
+        // "already on the roster" sends them looking for a duplicate that
+        // isn't there.
+        KitAddHintText.Text = name == null
+            ? "Type a kit name"
+            : _kitRoster.Kits.Any(k => k.Equals(name, StringComparison.OrdinalIgnoreCase))
+                ? "Already on the roster"
+                : $"Roster is full ({KitWheel.MaxKits} max)";
         KitAddHintText.IsVisible = true;
     }
 

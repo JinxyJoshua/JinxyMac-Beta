@@ -104,8 +104,14 @@ public static class PresetStore
 
             if (stored == null) return Defaults();
 
+            // A null element (a hand-edited "[null, {...}]") used to reach
+            // p.Name below and throw, which sent the whole load to the catch
+            // and Defaults() — resurrecting every preset the user had
+            // deliberately deleted, exactly what this store's own contract
+            // above says must not happen. Filtered out before that check runs,
+            // so one bad entry costs only itself.
             return stored
-                .Where(p => !string.IsNullOrWhiteSpace(p.Name))
+                .Where(p => p != null && !string.IsNullOrWhiteSpace(p.Name))
                 .Select(p => new ClickPreset(p.Name, p.Cps, p.Cdc, p.HoldMode))
                 .ToList();
         }
@@ -129,7 +135,7 @@ public static class PresetStore
                 })
                 .ToList();
 
-            System.IO.File.WriteAllText(File,
+            SettingsPath.WriteAtomic(File,
                 JsonSerializer.Serialize(stored, new JsonSerializerOptions { WriteIndented = true }));
         }
         catch

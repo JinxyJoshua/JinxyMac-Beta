@@ -38,7 +38,15 @@ public sealed class KeyMacro
         // 0 is included on purpose: it is the A key on macOS, and the
         // sentinel for "no key" lives at -1 now (see HotkeyBinding.Unbound),
         // so 0 no longer needs excluding here to keep the two apart.
-        Keys = keys.Where(k => k is >= 0 and < 256).ToArray();
+        //
+        // keys can arrive null: a hand-edited macros.json with one macro's
+        // "Keys" set to null deserializes StoredMacro.Keys to null despite
+        // its own initialiser (System.Text.Json overwrites it), and that null
+        // is passed straight through MacroStore.Load's call into here. Failing
+        // this one macro must not fail the whole file — treated as "no keys",
+        // which IsUsable already turns into "this macro does nothing" rather
+        // than a crash.
+        Keys = (keys ?? Enumerable.Empty<int>()).Where(k => k is >= 0 and < 256).ToArray();
         KeysText = keysText;
         IntervalMs = Math.Clamp(intervalMs, MinIntervalMs, MaxIntervalMs);
 
@@ -745,7 +753,7 @@ public static class MacroStore
 
                 try
                 {
-                    File.WriteAllText(MacrosFile,
+                    SettingsPath.WriteAtomic(MacrosFile,
                         JsonSerializer.Serialize(file, new JsonSerializerOptions { WriteIndented = true }));
                 }
                 catch
@@ -796,7 +804,7 @@ public static class MacroStore
 
             var file = new StoredFile { Platform = PlatformTag, SchemaVersion = CurrentSchema, Macros = stored };
 
-            File.WriteAllText(MacrosFile,
+            SettingsPath.WriteAtomic(MacrosFile,
                 JsonSerializer.Serialize(file, new JsonSerializerOptions { WriteIndented = true }));
         }
         catch { }

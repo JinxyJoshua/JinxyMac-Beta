@@ -105,6 +105,8 @@ public static class KitArtFetch
     private static async Task<bool> SaveAsync(
         HttpClient http, string kit, string url, CancellationToken token)
     {
+        string? temp = null;
+
         try
         {
             byte[] bytes = await http.GetByteArrayAsync(url, token).ConfigureAwait(false);
@@ -126,15 +128,41 @@ public static class KitArtFetch
 
             // No need to clear an earlier picture first: only kits that have
             // none in either folder reach here, and Find has already looked
-            // under every extension. Deleting before writing would only risk
-            // losing a file if the write then failed.
+            // under every extension.
+            //
+            // Written to a temp name and only then moved over the real one,
+            // same reasoning as Wallpaper.Store and KitImages.Set: closing the
+            // window mid-download — the ordinary way this app gets quit while
+            // art is still fetching — cancels this token, and
+            // File.WriteAllBytesAsync would otherwise have already created and
+            // truncated the real target before the cancellation is observed.
+            // That leaves a zero-length file sitting under the kit's real
+            // name, KitImages.Find reports the kit as having art, and the
+            // missing-art filter this method's own caller applies (RunAsync's
+            // "kits with no picture in either folder") skips it forever — the
+            // exact permanently-broken tile this whole method exists to avoid.
+            temp = target + ".tmp";
 
-            await File.WriteAllBytesAsync(target, bytes, token).ConfigureAwait(false);
+            await File.WriteAllBytesAsync(temp, bytes, token).ConfigureAwait(false);
+            File.Move(temp, target, overwrite: true);
 
             return true;
         }
         catch
         {
+            // Covers a genuine failure and a cancellation alike: either way,
+            // a half-written temp file must not be left behind to be found
+            // (wrongly) as this kit's art next launch.
+            try
+            {
+                if (temp != null && File.Exists(temp)) File.Delete(temp);
+            }
+            catch
+            {
+                // Best effort. A stray temp file is harmless — it is
+                // overwritten the next time this kit's art is fetched.
+            }
+
             return false;
         }
     }

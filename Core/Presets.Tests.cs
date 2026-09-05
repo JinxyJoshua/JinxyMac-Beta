@@ -178,4 +178,100 @@ public class PresetsTests
         Assert.Null(PresetStore.ParseRate("101", 100));
         Assert.Equal(100, PresetStore.ParseRate("100", 100));
     }
+
+    // ---- reading and writing the real file ----
+    //
+    // Load()/Save() read and write a fixed path (SettingsPath.For
+    // ("click_presets.json")), same as AppSettings and MacroStore — see
+    // those Tests.cs files for the backup/restore isolation this reuses.
+
+    private static string PresetsFilePath => SettingsPath.For("click_presets.json");
+
+    /// <summary>
+    /// A null element in the stored array — a hand-edited
+    /// "[null,{...}]" — used to reach p.Name in Load()'s filter and throw,
+    /// which sent the whole load to the catch and Defaults(), resurrecting
+    /// every preset the user had deliberately deleted. This is the exact
+    /// contract PresetStore's own class remarks promise: an empty (or here,
+    /// partly-null) list on disk must not be regenerated from code.
+    /// </summary>
+    [Fact]
+    public void ANullElementIsSkippedRatherThanResurrectingDeletedDefaults()
+    {
+        WithPresetsFile(
+            """[null,{"Name":"Custom","Cps":10,"Cdc":50,"HoldMode":false}]""",
+            () =>
+            {
+                ClickPreset only = Assert.Single(PresetStore.Load());
+                Assert.Equal("Custom", only.Name);
+            });
+    }
+
+    /// <summary>
+    /// A zero-length file — what a kill mid-write used to leave behind
+    /// before Save() went through SettingsPath.WriteAtomic — must load as
+    /// the shipped defaults, the same as a missing file, rather than crash.
+    /// </summary>
+    [Fact]
+    public void AZeroLengthFileLoadsAsDefaultsRatherThanCrashing()
+    {
+        WithPresetsFile("", () =>
+        {
+            Assert.Equal(PresetStore.Defaults().Count, PresetStore.Load().Count);
+        });
+    }
+
+    /// <summary>
+    /// Save() must leave the previous presets file exactly as it was when
+    /// the write fails partway, the same contract pinned directly at the
+    /// shared helper in SettingsPath.Tests.cs and exercised here through the
+    /// real caller.
+    /// </summary>
+    [Fact]
+    public void AFailedSaveLeavesThePreviousPresetsFileIntact()
+    {
+        WithPresetsFile(
+            """[{"Name":"Keep Me","Cps":10,"Cdc":50,"HoldMode":false}]""",
+            () =>
+            {
+                string temp = PresetsFilePath + ".tmp";
+                Directory.CreateDirectory(temp);
+
+                try
+                {
+                    PresetStore.Save(new List<ClickPreset> { new("Somebody Else", 1, 1) });
+
+                    string raw = File.ReadAllText(PresetsFilePath);
+                    Assert.Contains("Keep Me", raw);
+                    Assert.DoesNotContain("Somebody Else", raw);
+                }
+                finally
+                {
+                    if (Directory.Exists(temp)) Directory.Delete(temp, recursive: true);
+                }
+            });
+    }
+
+    /// <summary>
+    /// Backs up whatever is at the real click_presets.json and restores it
+    /// afterwards — the isolation pattern <c>AppSettings.Tests.cs</c> and
+    /// <c>KeyMacro.Tests.cs</c> use for their own fixed-path files.
+    /// </summary>
+    private static void WithPresetsFile(string? json, Action assertion)
+    {
+        string path = PresetsFilePath;
+        bool existed = File.Exists(path);
+        string? original = existed ? File.ReadAllText(path) : null;
+
+        try
+        {
+            if (json != null) File.WriteAllText(path, json);
+            assertion();
+        }
+        finally
+        {
+            if (existed) File.WriteAllText(path, original!);
+            else if (File.Exists(path)) File.Delete(path);
+        }
+    }
 }

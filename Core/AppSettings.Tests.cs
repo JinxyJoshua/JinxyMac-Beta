@@ -242,4 +242,60 @@ public class AppSettingsTests
                 Assert.True(new HotkeyBinding(reloaded.HotkeyCode, reloaded.HotkeyName).IsValid);
             });
     }
+
+    /// <summary>
+    /// A zero-length file is exactly what a kill mid-write used to leave
+    /// behind before Save() went through SettingsPath.WriteAtomic: the old
+    /// File.WriteAllText truncates its target before writing a single byte
+    /// of the new content. It must load as defaults, the same as a missing
+    /// file, rather than crash.
+    /// </summary>
+    [Fact]
+    public void AZeroLengthFileLoadsAsDefaultsRatherThanCrashing()
+    {
+        WithSettingsFile(
+            "",
+            () =>
+            {
+                AppSettings loaded = AppSettings.Load();
+
+                Assert.Equal(AppSettings.CurrentSchema, loaded.SchemaVersion);
+                Assert.Equal(-1, loaded.HotkeyCode);
+            });
+    }
+
+    /// <summary>
+    /// Pins the whole point of routing Save() through SettingsPath.WriteAtomic:
+    /// a write that fails partway must leave the settings file exactly as it
+    /// was, not truncated. Failure is forced the same way
+    /// Wallpaper.Tests.cs's AFailedCopyLeavesTheExistingWallpaperInPlace does —
+    /// by putting a directory where WriteAtomic's temp file needs to land, so
+    /// the write throws before the real file is ever touched.
+    /// </summary>
+    [Fact]
+    public void AFailedSaveLeavesThePreviousSettingsFileIntact()
+    {
+        WithSettingsFile(
+            """{"HotkeyCode":15,"HotkeyName":"R","SchemaVersion":1}""",
+            () =>
+            {
+                string temp = SettingsFilePath + ".tmp";
+                Directory.CreateDirectory(temp);
+
+                try
+                {
+                    var settings = new AppSettings { HotkeyCode = 99, HotkeyName = "Z" };
+                    settings.Save();
+
+                    string raw = File.ReadAllText(SettingsFilePath);
+                    using var doc = System.Text.Json.JsonDocument.Parse(raw);
+                    Assert.Equal(15, doc.RootElement.GetProperty("HotkeyCode").GetInt32());
+                    Assert.Equal("R", doc.RootElement.GetProperty("HotkeyName").GetString());
+                }
+                finally
+                {
+                    if (Directory.Exists(temp)) Directory.Delete(temp, recursive: true);
+                }
+            });
+    }
 }

@@ -217,7 +217,7 @@ public sealed class AppSettings
     {
         try
         {
-            System.IO.File.WriteAllText(File,
+            SettingsPath.WriteAtomic(File,
                 JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
         }
         catch

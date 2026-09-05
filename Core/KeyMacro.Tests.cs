@@ -25,6 +25,23 @@ public class KeyMacroTests
     }
 
     /// <summary>
+    /// A hand-edited macros.json can carry one macro with <c>"Keys":null</c> —
+    /// System.Text.Json overwrites StoredMacro.Keys's own initialiser with an
+    /// explicit JSON null — which used to reach the constructor's
+    /// <c>keys.Where(...)</c> and throw. That one macro must degrade to "no
+    /// keys" (unusable, but present) rather than take the whole load down
+    /// with it.
+    /// </summary>
+    [Fact]
+    public void NullKeysDegradesToNoKeysRatherThanThrowing()
+    {
+        var macro = new KeyMacro("Broken", null!, "", 100);
+
+        Assert.Empty(macro.Keys);
+        Assert.False(macro.IsUsable);
+    }
+
+    /// <summary>
     /// A zero interval is a key that never comes up and a core pinned sending
     /// it. The clamp is what stops a typo becoming a hang.
     /// </summary>
@@ -428,6 +445,79 @@ public class KeyMacroTests
         {
             Assert.Empty(MacroStore.Load());
         });
+    }
+
+    /// <summary>
+    /// A zero-length file — what a kill mid-write used to leave behind before
+    /// Save() and the migration rewrite both went through
+    /// SettingsPath.WriteAtomic — must load as no macros, the same as a
+    /// missing file, rather than crash.
+    /// </summary>
+    [Fact]
+    public void AZeroLengthFileLoadsAsEmptyRatherThanCrashing()
+    {
+        WithMacrosFile("", () =>
+        {
+            Assert.Empty(MacroStore.Load());
+        });
+    }
+
+    /// <summary>
+    /// One macro with a null "Keys" in an otherwise-valid file must not cost
+    /// the rest of the file: it loads alongside its neighbour with no keys of
+    /// its own, rather than throwing and losing every macro on the next Save.
+    /// </summary>
+    [Fact]
+    public void AMacroWithNullKeysLoadsAlongsideItsNeighbourRatherThanLosingTheWholeFile()
+    {
+        WithMacrosFile(
+            """
+            {"platform":"macos","schemaVersion":1,"macros":[
+                {"Name":"Broken","Keys":null,"KeysText":"","IntervalMs":100},
+                {"Name":"Spam R","Keys":[82],"KeysText":"R","IntervalMs":120}
+            ]}
+            """,
+            () =>
+            {
+                List<KeyMacro> loaded = MacroStore.Load();
+
+                Assert.Equal(2, loaded.Count);
+                KeyMacro broken = loaded.Single(m => m.Name == "Broken");
+                Assert.Empty(broken.Keys);
+                KeyMacro ok = loaded.Single(m => m.Name == "Spam R");
+                Assert.Equal(new[] { 82 }, ok.Keys);
+            });
+    }
+
+    /// <summary>
+    /// Save() must leave the previous macros.json exactly as it was when the
+    /// write fails partway, the same contract pinned directly at the shared
+    /// helper in SettingsPath.Tests.cs and exercised here through the real
+    /// caller.
+    /// </summary>
+    [Fact]
+    public void AFailedSaveLeavesThePreviousMacrosFileIntact()
+    {
+        WithMacrosFile(
+            """{"platform":"macos","schemaVersion":1,"macros":[{"Name":"Spam R","Keys":[82],"KeysText":"R","IntervalMs":120}]}""",
+            () =>
+            {
+                string temp = MacrosFilePath + ".tmp";
+                Directory.CreateDirectory(temp);
+
+                try
+                {
+                    MacroStore.Save(new List<KeyMacro> { new("Somebody Else", new[] { 1 }, "1", 100) });
+
+                    string raw = File.ReadAllText(MacrosFilePath);
+                    Assert.Contains("Spam R", raw);
+                    Assert.DoesNotContain("Somebody Else", raw);
+                }
+                finally
+                {
+                    if (Directory.Exists(temp)) Directory.Delete(temp, recursive: true);
+                }
+            });
     }
 
     // ---- schema migration: 0 used to mean unbound, now means A ----

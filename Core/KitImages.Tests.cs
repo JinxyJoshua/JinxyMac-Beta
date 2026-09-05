@@ -93,6 +93,52 @@ public class KitImagesTests
         Assert.Null(KitImages.Set("Melody", @"C:\nowhere\clip.mp4"));
     }
 
+    /// <summary>
+    /// Set() used to clear the old picture (Remove) before copying the new
+    /// one in, so a copy that failed partway — the source on a share that
+    /// disconnects, a full disk, the app killed in between — left the kit
+    /// with no picture in either extension and returned null with no way to
+    /// undo it. The fix copies to a temp file first, same as
+    /// Wallpaper.Store, so the old picture is only ever cleared once the new
+    /// one is known good on disk.
+    /// </summary>
+    [Fact]
+    public void AFailedCopyLeavesTheExistingPictureInPlace()
+    {
+        string oldSource = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"kit-old-{Guid.NewGuid():N}.png");
+        string newSource = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"kit-new-{Guid.NewGuid():N}.png");
+        System.IO.File.WriteAllBytes(oldSource, new byte[] { 1, 2, 3 });
+        System.IO.File.WriteAllBytes(newSource, new byte[] { 4, 5, 6 });
+
+        string target = KitImages.PathFor(Invented, ".png");
+        string temp = target + ".tmp";
+
+        try
+        {
+            // Store the first picture for real, so there is something in
+            // place worth protecting.
+            Assert.Equal(target, KitImages.Set(Invented, oldSource));
+            Assert.True(System.IO.File.Exists(target));
+
+            // Block the copy by putting a directory where the temp file
+            // needs to land, so File.Copy throws partway through Set.
+            System.IO.Directory.CreateDirectory(temp);
+
+            Assert.Null(KitImages.Set(Invented, newSource));
+
+            // The old picture is exactly as it was — never cleared.
+            Assert.True(System.IO.File.Exists(target));
+            Assert.Equal(new byte[] { 1, 2, 3 }, System.IO.File.ReadAllBytes(target));
+        }
+        finally
+        {
+            if (System.IO.Directory.Exists(temp)) System.IO.Directory.Delete(temp, recursive: true);
+            KitImages.Remove(Invented);
+            System.IO.File.Delete(oldSource);
+            System.IO.File.Delete(newSource);
+        }
+    }
+
     [Fact]
     public void OffersEveryAcceptedFormatInThePicker()
     {

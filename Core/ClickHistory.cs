@@ -41,7 +41,25 @@ public sealed class ClickHistory
 
     public double TotalSeconds { get; set; }
     public long TotalClicks { get; set; }
-    public List<HistoryDay> Days { get; set; } = new();
+
+    private List<HistoryDay> _days = new();
+
+    /// <summary>
+    /// A hand-edited history.json with <c>"Days":null</c> deserializes this to
+    /// null despite the field initialiser above — System.Text.Json overwrites
+    /// an initialiser whenever the JSON carries an explicit null. Load's own
+    /// try/catch cannot save <see cref="Add"/> from that: Add runs later, on
+    /// every click, with no try/catch of its own (unlike Load and Save), so an
+    /// unguarded null here is an unhandled exception on the UI thread the next
+    /// time somebody clicks. The setter turns that null into an empty list
+    /// instead, which is what "no days recorded yet" already means everywhere
+    /// else in this file.
+    /// </summary>
+    public List<HistoryDay> Days
+    {
+        get => _days;
+        set => _days = value ?? new List<HistoryDay>();
+    }
 
     public static ClickHistory Load()
     {
@@ -62,7 +80,7 @@ public sealed class ClickHistory
     {
         try
         {
-            File.WriteAllText(HistoryFile,
+            SettingsPath.WriteAtomic(HistoryFile,
                 JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
         }
         catch
