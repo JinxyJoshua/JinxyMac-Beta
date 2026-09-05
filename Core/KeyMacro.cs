@@ -790,6 +790,47 @@ public static class MacroStore
         macros.FirstOrDefault(m => !ReferenceEquals(m, excluding) && m.Hotkey.IsValid && m.Hotkey.Code == code);
 
     /// <summary>
+    /// Whether this toggle hotkey is one of the keys the macro itself sends —
+    /// the trap where a macro starts on its own key but can never be stopped
+    /// by it again.
+    /// </summary>
+    /// <remarks>
+    /// <c>MainWindow.axaml.cs</c>'s <c>Fire(int code)</c> refuses any code a
+    /// currently-running macro is sending (<c>MacroRunner.RunningKeys</c>)
+    /// before it ever gets to checking whose toggle that code is — that guard
+    /// is what stops the switcher's own cycling from retriggering a fixed
+    /// hotkey bound to the same key (see <c>RunningKeys</c>'s remarks). A
+    /// macro whose own toggle is one of the keys it sends gets caught by that
+    /// same guard the instant it starts running: the toggle press that would
+    /// stop it never reaches <c>MacroWithHotkey</c>, because <c>RunningKeys</c>
+    /// already contains that code. The macro's card switch and "Stop all"
+    /// still work — only the advertised toggle goes dead.
+    ///
+    /// The fix is to refuse the binding, not to carve an exception into
+    /// <c>Fire()</c> for a macro's own key: exempting it there would let the
+    /// macro's own synthetic press toggle it back off mid-run, which is the
+    /// exact HID-echo retrigger <c>RunningKeys</c> was added to close, just
+    /// narrowed to one macro.
+    ///
+    /// Checked from two call sites, since either one alone leaves the other
+    /// route open: <c>MainWindow.Macros.cs</c>'s <c>BindMacroHotkey</c> (a
+    /// hotkey bound to a key the macro already sends) and <c>SaveMacro</c> (a
+    /// keys edit that comes to include a key already bound as the toggle).
+    /// </remarks>
+    public static bool TrapsOwnToggle(IEnumerable<int> keys, HotkeyBinding hotkey) =>
+        hotkey.IsValid && keys.Contains(hotkey.Code);
+
+    /// <summary>
+    /// The refusal shown for <see cref="TrapsOwnToggle"/>, in the same voice
+    /// as <see cref="UnbindableAMessage"/> and the plain "already the X key"
+    /// clash message: name the key, say why it can't be this, say what to do.
+    /// </summary>
+    public static string OwnKeyTrapMessage(string hotkeyName) =>
+        $"{hotkeyName} is one of this macro's own keys. A running macro swallows its own key "
+        + "presses before any hotkey is checked, so this would start it but could never stop it. "
+        + "Pick a hotkey the macro doesn't send, or drop that key from the macro.";
+
+    /// <summary>
     /// A can't be bound on this build — see <see cref="HotkeyBinding.Unbound"/>
     /// for why its own code doubles as "no key at all" on macOS. Shared by
     /// every place that can hit it: a typed KEY box on the Macros page, a

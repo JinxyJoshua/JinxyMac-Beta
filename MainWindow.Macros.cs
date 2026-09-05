@@ -203,6 +203,20 @@ public partial class MainWindow
 
             var binding = new HotkeyBinding(code, name);
 
+            // A macro's own keys never surface in HotkeyHolder — that check
+            // is about who else holds a code, not whether this macro sends
+            // it itself. Refused here rather than left to Fire(): once the
+            // macro is running, RunningKeys() would swallow its own toggle
+            // press before Fire() ever looked up whose hotkey it was, so the
+            // macro could start but never stop by keypress again. See
+            // MacroStore.TrapsOwnToggle's remarks.
+            if (macro != null && MacroStore.TrapsOwnToggle(macro.Keys, binding))
+            {
+                button.Content = previous;
+                ShowMacroHotkeyNotice(MacroStore.OwnKeyTrapMessage(name));
+                return;
+            }
+
             if (macro == null)
             {
                 _pendingNewMacroHotkey = binding;
@@ -335,6 +349,18 @@ public partial class MainWindow
         // MacroStore.ResolveSaveHotkey for why.
         KeyMacro? existing = MacroStore.Find(_macroList, name);
         (HotkeyBinding hotkey, string? replaceNotice) = MacroStore.ResolveSaveHotkey(existing, _pendingNewMacroHotkey);
+
+        // The other route into the same trap BindMacroHotkey guards against:
+        // editing this macro's own keys to include a code that is already its
+        // toggle (or picking a toggle here that matches keys just typed).
+        // Caught before anything is stopped or saved, for the same reason —
+        // RunningKeys() would swallow that code the moment the macro starts,
+        // and the toggle that started it could never stop it again.
+        if (MacroStore.TrapsOwnToggle(keys.Value.Keys, hotkey))
+        {
+            ShowMacroNotice(MacroStore.OwnKeyTrapMessage(hotkey.Name));
+            return;
+        }
 
         // Replacing a running macro would otherwise leave the old thread going
         // with the old keys, invisibly, its card having been rebuilt.

@@ -289,6 +289,59 @@ public class KeyMacroTests
         Assert.Same(macro, MacroStore.FindByHotkeyCode(macros, 99));
     }
 
+    // ---- a toggle that would trap itself ----
+    //
+    // Fire() (MainWindow.axaml.cs) refuses any code a running macro's own
+    // RunningKeys() reports before it ever checks whose toggle that code is.
+    // A macro whose toggle is one of its own keys is caught by that same
+    // guard the moment it starts: the press that should stop it never gets
+    // as far as MacroWithHotkey. TrapsOwnToggle is the check that refuses the
+    // binding up front instead — see its remarks for why Fire() itself is not
+    // the place to special-case this.
+
+    [Fact]
+    public void TrapsOwnToggleRefusesAHotkeyMatchingOneOfTheMacrosOwnKeys()
+    {
+        var hotkey = new HotkeyBinding(KeyCodes.For('R')!.Value, "R");
+
+        Assert.True(MacroStore.TrapsOwnToggle(new[] { KeyCodes.For('R')!.Value }, hotkey));
+    }
+
+    /// <summary>Not this trap — a code another macro sends is an ordinary clash, not a self-trap.</summary>
+    [Fact]
+    public void TrapsOwnToggleAllowsAHotkeyMatchingADifferentMacrosKeys()
+    {
+        var hotkey = new HotkeyBinding(KeyCodes.For('R')!.Value, "R");
+
+        Assert.False(MacroStore.TrapsOwnToggle(new[] { KeyCodes.For('T')!.Value }, hotkey));
+    }
+
+    [Fact]
+    public void TrapsOwnToggleAllowsAnUnboundToggle()
+    {
+        Assert.False(MacroStore.TrapsOwnToggle(new[] { KeyCodes.For('R')!.Value }, HotkeyBinding.Unbound));
+    }
+
+    /// <summary>
+    /// The edit-direction route: the toggle was bound to R first (SaveMacro
+    /// carries it over via ResolveSaveHotkey when the form's own slot is
+    /// left empty), and only afterwards is the macro's Keys box edited to
+    /// include R. Same trap, same check — SaveMacro runs it against the
+    /// freshly parsed keys and the hotkey ResolveSaveHotkey settled on, not
+    /// only at bind time.
+    /// </summary>
+    [Fact]
+    public void TrapsOwnToggleCatchesKeysEditedToIncludeAnAlreadyBoundToggle()
+    {
+        var existing = new KeyMacro("Spam", new[] { KeyCodes.For('Q')!.Value }, "Q", 120,
+            hotkey: new HotkeyBinding(KeyCodes.For('R')!.Value, "R"));
+
+        (HotkeyBinding hotkey, _) = MacroStore.ResolveSaveHotkey(existing, pending: HotkeyBinding.Unbound);
+        (int[] editedKeys, _) = MacroStore.ParseKeys("R")!.Value;
+
+        Assert.True(MacroStore.TrapsOwnToggle(editedKeys, hotkey));
+    }
+
     /// <summary>
     /// Nothing ships. An example macro reads as a feature of the app rather
     /// than something the user made, and the first instinct is to delete it.
