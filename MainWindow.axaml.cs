@@ -73,12 +73,37 @@ public partial class MainWindow : Window
     /// value does not immediately look like the user changing it.</summary>
     private bool _loading;
 
+    /// <summary>A cached copy of <see cref="Window.IsActive"/>, kept current
+    /// from the UI thread so <see cref="MacroRunner.Suppressed"/> — read from
+    /// the macro thread — has something safe to read instead of the
+    /// property itself.</summary>
+    private volatile bool _windowActive;
+
     private long _lastClicks;
     private DateTime _lastTick = DateTime.UtcNow;
 
     public MainWindow()
     {
         InitializeComponent();
+
+        // Real state up front rather than the field's default false: a
+        // window can already be active by the time this constructor runs
+        // (Avalonia activates the first window before it is shown on some
+        // platforms), and starting stale would let a macro send into this
+        // window until the first activation change corrected it.
+        _windowActive = IsActive;
+
+        // IsActiveProperty's own change notification, not the Activated and
+        // Deactivated events: a probe logged both side by side and the
+        // events fire out of step with IsActive's own value — Activated
+        // fires a moment before IsActive reads true, Deactivated a moment
+        // after it has already gone false — so a handler that reads IsActive
+        // inside either event sees a stale value. The property notification
+        // carries the correct value directly in NewValue with no such gap.
+        PropertyChanged += (_, e) =>
+        {
+            if (e.Property == IsActiveProperty) _windowActive = (bool)e.NewValue!;
+        };
 
         // The whole reason the engine is behind an interface: on Windows this
         // app is fully usable, so every page can be judged before a Mac is ever
@@ -119,7 +144,11 @@ public partial class MainWindow : Window
 
             // Lets a dip end when the weapon has actually fired rather than
             // when a stopwatch says it probably has.
-            Clicks = () => _clicker.ClickCount
+            Clicks = () => _clicker.ClickCount,
+
+            // The cached copy, not IsActive itself: this is read from the
+            // macro thread and the property is not safe to touch from there.
+            Suppressed = () => _windowActive
         };
 
         WireNavigation();

@@ -291,4 +291,63 @@ public class MacroRunnerTests
 
         Assert.Empty(runner.RunningKeys());
     }
+
+    /// <summary>
+    /// <see cref="MacroRunner.Suppressed"/> is what stops a macro typing into
+    /// this app's own window (<c>MainWindow</c> wires it to a cached
+    /// <c>IsActive</c>). This is the guarantee that matters: nothing sent
+    /// while it reads true, sending resumes once it reads false, and — the
+    /// subtle part — the cycle keeps advancing the whole time it was
+    /// suppressed, so a two-key macro does not resume stuck resending the key
+    /// it was on when suppression began.
+    /// </summary>
+    /// <remarks>
+    /// Suppression is lifted by a call count on <c>Suppressed</c> itself
+    /// rather than after a fixed sleep, so which key resumes first is
+    /// deterministic instead of a race against the dwell timer: the callback
+    /// is invoked exactly once per loop cycle (see <c>Loop</c>), so returning
+    /// true for the first three calls and false after guarantees three
+    /// suppressed cycles have elapsed — an odd number, which lands a two-key
+    /// macro's cursor back on index 1 by the time it resumes. If the cycle
+    /// did not advance while suppressed, resuming would instead resend index
+    /// 0 (0x31) — the key it was on when suppression began.
+    /// </remarks>
+    [Fact]
+    public void SuppressedMacroSendsNothingThenResumesWithoutStickingOnTheStartingKey()
+    {
+        var engine = new FakeKeyEngine();
+        using var runner = new MacroRunner(engine);
+
+        long calls = 0;
+        runner.Suppressed = () => Interlocked.Increment(ref calls) <= 3;
+
+        var macro = new KeyMacro("Switcher", new[] { 0x31, 0x32 }, "1, 2", 30);
+        runner.Start(macro);
+
+        // Wait for the third suppressed cycle to be evaluated, but no
+        // further — the fourth call is the one that lifts suppression and
+        // sends, so checking immediately after the third keeps the empty
+        // assertion below out of a race with it.
+        for (int i = 0; i < 500 && Interlocked.Read(ref calls) < 3; i++)
+            Thread.Sleep(2);
+
+        Assert.Empty(engine.Events);
+
+        // Wait for the resumed send. Generous: the dwell after the third
+        // suppressed cycle must fully elapse before the fourth call fires.
+        for (int i = 0; i < 500 && engine.Events.Count == 0; i++)
+            Thread.Sleep(2);
+
+        runner.Stop("Switcher");
+        Thread.Sleep(150);
+
+        var events = engine.Events;
+        Assert.NotEmpty(events);
+
+        // The first key to actually land is the second slot, not the first —
+        // proof the cursor moved on while nothing was sent, rather than
+        // sitting on index 0 for the whole suppressed stretch.
+        Assert.True(events[0].Down);
+        Assert.Equal(0x32, events[0].Code);
+    }
 }

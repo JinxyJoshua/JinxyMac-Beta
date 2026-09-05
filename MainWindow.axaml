@@ -1435,7 +1435,7 @@
                                 <TextBlock Name="MacroRunningText" Text="Nothing running."
                                            Classes="hint" Margin="0,8,0,0"/>
                                 <TextBlock Classes="hint" Margin="0,6,0,0"
-                                           Text="A macro types a key over and over while it is on. It goes to whatever window is in front, so switch to the game before starting one."/>
+                                           Text="A macro types a key over and over while it is on, but it is held back while this window is in front. Switch to the game and it starts landing there — after that it goes to whatever window is focused, not only the game."/>
                             </StackPanel>
                         </Border>
 

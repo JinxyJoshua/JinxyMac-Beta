@@ -234,12 +234,16 @@ public sealed class MacroRunner : IDisposable
     /// Called on the macro thread, so whatever is behind it must be safe to
     /// call from anywhere.
     ///
-    /// Currently unassigned in this build: nothing sets this property, so it
-    /// always reads null and every macro sends unconditionally regardless of
-    /// what is focused. The Windows original wires it to a foreground-window
-    /// check; wiring the same thing here needs a macOS frontmost-window check,
-    /// which this port has not added. Do not assume a macro is suppressed
-    /// while some other window has focus until something sets this.
+    /// <c>MainWindow</c> wires this to a cached copy of Avalonia's
+    /// <c>Window.IsActive</c> — true exactly while this app's window has
+    /// focus, on both platforms — rather than a platform-specific
+    /// foreground-window check like the Windows original's. The cache exists
+    /// because <c>IsActive</c> itself is a UI property and must not be read
+    /// from this thread.
+    ///
+    /// The cycle still advances while a press is skipped (see the comment in
+    /// <see cref="Loop"/>): alt-tabbing away and back does not leave a macro
+    /// stuck resending the key it was on when suppression began.
     /// </remarks>
     public Func<bool>? Suppressed { get; set; }
 
