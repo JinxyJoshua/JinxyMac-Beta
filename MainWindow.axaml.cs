@@ -73,12 +73,37 @@ public partial class MainWindow : Window
     /// value does not immediately look like the user changing it.</summary>
     private bool _loading;
 
+    /// <summary>A cached copy of <see cref="Window.IsActive"/>, kept current
+    /// from the UI thread so <see cref="MacroRunner.Suppressed"/> — read from
+    /// the macro thread — has something safe to read instead of the
+    /// property itself.</summary>
+    private volatile bool _windowActive;
+
     private long _lastClicks;
     private DateTime _lastTick = DateTime.UtcNow;
 
     public MainWindow()
     {
         InitializeComponent();
+
+        // Real state up front rather than the field's default false: a
+        // window can already be active by the time this constructor runs
+        // (Avalonia activates the first window before it is shown on some
+        // platforms), and starting stale would let a macro send into this
+        // window until the first activation change corrected it.
+        _windowActive = IsActive;
+
+        // IsActiveProperty's own change notification, not the Activated and
+        // Deactivated events: a probe logged both side by side and the
+        // events fire out of step with IsActive's own value — Activated
+        // fires a moment before IsActive reads true, Deactivated a moment
+        // after it has already gone false — so a handler that reads IsActive
+        // inside either event sees a stale value. The property notification
+        // carries the correct value directly in NewValue with no such gap.
+        PropertyChanged += (_, e) =>
+        {
+            if (e.Property == IsActiveProperty) _windowActive = (bool)e.NewValue!;
+        };
 
         // The whole reason the engine is behind an interface: on Windows this
         // app is fully usable, so every page can be judged before a Mac is ever
@@ -119,7 +144,11 @@ public partial class MainWindow : Window
 
             // Lets a dip end when the weapon has actually fired rather than
             // when a stopwatch says it probably has.
-            Clicks = () => _clicker.ClickCount
+            Clicks = () => _clicker.ClickCount,
+
+            // The cached copy, not IsActive itself: this is read from the
+            // macro thread and the property is not safe to touch from there.
+            Suppressed = () => _windowActive
         };
 
         WireNavigation();
@@ -132,6 +161,7 @@ public partial class MainWindow : Window
         WireKitWheel();
         WireMacros();
         WireSwitcher();
+        WireMacroBadge();
         WireTheme();
         WireSettings();
         WireCache();
@@ -149,8 +179,12 @@ public partial class MainWindow : Window
         // shipped defaults are already in force, and nothing waits on this.
         _ = LoadRemoteConfig();
 
-        // Quietly, and only if asked for. Nothing is downloaded without a press.
-        if (_settings.AutoCheckUpdates) _ = CheckForUpdate(announce: false);
+        // Quietly, and only if asked for. Nothing is downloaded without a
+        // press. OfferUpdateAtLaunch (MainWindow.UpdateOffer.cs) runs this
+        // same check and, if it finds something, raises the offer window —
+        // CheckForUpdate itself is unchanged and still lights up the
+        // Settings page's own UpdateBox exactly as it always has.
+        if (_settings.AutoCheckUpdates) _ = OfferUpdateAtLaunch();
 
         _stats = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _stats.Tick += (_, _) => UpdateMeasured();
@@ -180,6 +214,17 @@ public partial class MainWindow : Window
 
             _recorder.Dispose();
             _replay.Dispose();
+
+            // Before _macros.Dispose(): Dispose calls StopAll, which raises
+            // Changed for any macro still running at shutdown, and the
+            // subscription in WireMacroBadge posts a RefreshMacroBadge
+            // continuation to the UI thread in response. Unsubscribing (and
+            // closing the badge, which is the other half of the same
+            // teardown — see UnwireMacroBadge) first means that
+            // continuation is never queued in the first place, rather than
+            // relying on it landing after Close() and being a no-op there.
+            UnwireMacroBadge();
+
             _macros.Dispose();
             _clicker.Dispose();
             _shaker.Dispose();
@@ -197,13 +242,13 @@ public partial class MainWindow : Window
     {
         Wire(NavClicker, PageClicker, "Clicker", "Configure your own click engine");
         Wire(NavPresets, PagePresets, "Presets", "Saved click configurations");
+        Wire(NavMacros, PageMacros, "Macros", "Spam a key, or cycle a few");
+        Wire(NavSwitcher, PageSwitcher, "Auto Switcher", "Swap between two hotbar slots");
         Wire(NavRecorder, PageRecorder, "Recorder", "Screen capture, hardware encoded");
+        Wire(NavKitWheel, PageKitWheel, "Kit Wheel", "Roll a kit you have not played yet");
         Wire(NavHistory, PageHistory, "History", "Time spent clicking, and how much of it landed");
         Wire(NavTheme, PageTheme, "Theme", "Accent colour");
         Wire(NavSettings, PageSettings, "Settings", "Where things are stored, and what this build can do");
-        Wire(NavKitWheel, PageKitWheel, "Kit Wheel", "Roll a kit you have not played yet");
-        Wire(NavMacros, PageMacros, "Macros", "Spam a key, or cycle a few");
-        Wire(NavSwitcher, PageSwitcher, "Auto Switcher", "Swap between two hotbar slots");
 
         void Wire(RadioButton button, Control page, string title, string subtitle) =>
             button.IsCheckedChanged += (_, _) =>
@@ -558,7 +603,7 @@ public partial class MainWindow : Window
 
         // The key on the button, the way the Windows build shows it, so the
         // binding is readable without looking at the card below.
-        string key = _settings.HotkeyCode == 0 ? "" : _settings.HotkeyName + "  ";
+        string key = _settings.HotkeyCode < 0 ? "" : _settings.HotkeyName + "  ";
 
         StartStopButton.Content = key + (running ? "STOP" : "START");
 
@@ -845,7 +890,10 @@ public partial class MainWindow : Window
     /// </remarks>
     private void Fire(int code)
     {
-        if (code == 0) return;
+        // Not "== 0": 0 is the A key now, and a hotkey bound to A must fire
+        // like any other. Only a negative code — HotkeyBinding.Unbound's
+        // sentinel — means nothing was pressed.
+        if (code < 0) return;
         if (_macros.RunningKeys().Contains(code)) return;
 
         if (code == _settings.HotkeyCode)
@@ -877,7 +925,7 @@ public partial class MainWindow : Window
     /// </remarks>
     private void Lifted(int code)
     {
-        if (code == 0 || code != _settings.HotkeyCode) return;
+        if (code < 0 || code != _settings.HotkeyCode) return;
         if (HoldModeButton.IsChecked != true) return;
 
         if (_clicker.IsRunning) Toggle();
@@ -910,22 +958,6 @@ public partial class MainWindow : Window
             _hotkeys.CaptureNext((code, name) => Dispatcher.UIThread.Post(() =>
             {
                 _rebinding = false;
-
-                // Code 0 is both "not set" and, on macOS, the A key's real code
-                // (see HotkeyBinding.Unbound) — so a press of A here has to be
-                // refused with an explanation, the same one BindMacroHotkey
-                // gives, rather than stored as a hotkey that looks bound ("A")
-                // but can never fire: MacHotkeyWatcher.Bindable(0) is false, so
-                // ArmHotkeys never actually watches it, and Fire() returns
-                // early on code 0 anyway — a dead hotkey that displays as set.
-                if (code == 0)
-                {
-                    button.Content = previous;
-
-                    HotkeyNoticeText.Text = MacroStore.UnbindableAMessage;
-                    HotkeyNoticeText.IsVisible = true;
-                    return;
-                }
 
                 // One key, one action. Bound twice, only the first would ever
                 // run — which reads as a hotkey that quietly stopped working
@@ -2634,28 +2666,22 @@ public partial class MainWindow : Window
         UpdateProgress.IsVisible = true;
         UpdateProgress.Value = 0;
 
-        var progress = new Progress<double>(fraction =>
-            UpdateProgress.Value = Math.Clamp(fraction, 0, 1));
+        // RunInstall (MainWindow.UpdateOffer.cs) is the one place that
+        // calls Updater.InstallAsync and decides what happens next — shared
+        // with UpdateOfferWindow so the manual and launch-time paths cannot
+        // install differently.
+        await RunInstall(
+            update,
+            onHeadline: text => UpdateHeadlineText.Text = text,
+            onProgress: fraction => UpdateProgress.Value = fraction,
+            onFailure: failure =>
+            {
+                UpdateProgress.IsVisible = false;
+                UpdateHeadlineText.Text = failure;
 
-        UpdateHeadlineText.Text = $"Downloading {update.Version}…";
-
-        string? failure = await Updater.InstallAsync(update, progress);
-
-        if (failure == null)
-        {
-            // The swap script is waiting for this process to go away before it
-            // touches the bundle, so closing is the last step of the install
-            // rather than a courtesy.
-            UpdateHeadlineText.Text = "Installing. Jinxy will reopen by itself.";
-            Close();
-            return;
-        }
-
-        UpdateProgress.IsVisible = false;
-        UpdateHeadlineText.Text = failure;
-
-        InstallUpdateButton.IsEnabled = true;
-        CheckUpdateButton.IsEnabled = true;
+                InstallUpdateButton.IsEnabled = true;
+                CheckUpdateButton.IsEnabled = true;
+            });
     }
     // ---- Roblox cache ----
 
@@ -3018,7 +3044,7 @@ public partial class MainWindow : Window
     private void RefreshHotkeySummary()
     {
         string[] bound = Bindings()
-            .Where(b => b.Code != 0)
+            .Where(b => b.Code >= 0)
             .Select(b => $"{b.Action}: {b.Name}")
             .ToArray();
 
@@ -3120,7 +3146,13 @@ public partial class MainWindow : Window
             catch { /* nothing there, or held open */ }
         }
 
-        var fresh = new AppSettings();
+        // Stamped explicitly, the same way Load()'s missing-file and
+        // corrupt-file paths do: a freshly constructed AppSettings defaults
+        // SchemaVersion to 0, and this object is about to be reflection-copied
+        // wholesale onto _settings. Leaving it at 0 would write a settings
+        // file that looks pre-migration — so the next launch would "migrate"
+        // a hotkey bound to A (HotkeyCode 0) straight back to unbound (-1).
+        var fresh = new AppSettings { SchemaVersion = AppSettings.CurrentSchema };
 
         foreach (System.Reflection.PropertyInfo property in typeof(AppSettings).GetProperties())
         {

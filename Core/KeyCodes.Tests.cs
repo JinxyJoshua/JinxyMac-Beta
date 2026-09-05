@@ -27,13 +27,28 @@ public class KeyCodesTests
     }
 
     /// <summary>
-    /// 'A' is unrepresentable on macOS: its real code is 0, which is also
-    /// HotkeyBinding.Unbound's sentinel for "no key" — see the remarks there.
+    /// 'A' is kVK_ANSI_A, code 0 — no longer refused now that
+    /// HotkeyBinding.Unbound's sentinel moved to -1 and stopped colliding
+    /// with it.
     /// </summary>
     [Fact]
-    public void MacTableRefusesAWhoseCodeCollidesWithUnbound()
+    public void MacTableGivesAItsRealCode()
     {
-        Assert.Null(KeyCodes.Mac('A'));
+        Assert.Equal(0, KeyCodes.Mac('A'));
+    }
+
+    /// <summary>
+    /// For('A') must dispatch to the macOS table's 0 when running on macOS —
+    /// same pattern as ForReturnsTheRunningPlatformsOwnValue, computing the
+    /// expected value from the platform actually running this suite rather
+    /// than hard-coding an assumption a non-Mac CI machine would fail on.
+    /// </summary>
+    [Fact]
+    public void ForGivesAItsMacCodeOfZeroOnMacOS()
+    {
+        int? expected = OperatingSystem.IsMacOS() ? 0 : (int)'A';
+
+        Assert.Equal(expected, KeyCodes.For('A'));
     }
 
     [Fact]

@@ -24,6 +24,8 @@
     <Compile Include="../Core/ClickHistory.Tests.cs" />
     <Compile Include="../Core/Updater.cs" />
     <Compile Include="../Core/Updater.Tests.cs" />
+    <Compile Include="../Core/UpdateOffer.cs" />
+    <Compile Include="../Core/UpdateOffer.Tests.cs" />
     <Compile Include="../Core/RobloxCache.cs" />
     <Compile Include="../Core/RobloxCache.Tests.cs" />
     <Compile Include="../Core/Notify.cs" />
@@ -41,6 +43,8 @@
     <Compile Include="../Core/Wallpaper.cs" />
     <Compile Include="../Core/Wallpaper.Tests.cs" />
     <Compile Include="../Core/HotkeyBinding.cs" />
+    <Compile Include="../Core/AppSettings.cs" />
+    <Compile Include="../Core/AppSettings.Tests.cs" />
     <Compile Include="../Core/KeyCodes.cs" />
     <Compile Include="../Core/KeyCodes.Tests.cs" />
     <Compile Include="../Core/KeyMacro.cs" />

@@ -60,7 +60,7 @@ public sealed class MacHotkeyWatcher : IHotkeyWatcher
         _watched = codes.Where(Bindable).Distinct().ToArray();
 
     private static bool Bindable(int code) =>
-        code is > 0 and < 128 || IsMouse(code);
+        code is >= 0 and < 128 || IsMouse(code);
 
     private static bool IsMouse(int code) => code >= MouseBase;
 

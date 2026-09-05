@@ -31,14 +31,14 @@ public sealed class KeyMacro
         Enabled = enabled;
         Name = name;
         // These are the platform's own key codes — CGKeyCodes here, virtual-key
-        // codes on Windows. Both spaces pass this same 0 < k < 256 filter while
-        // meaning entirely different keys; nothing this narrow can tell them
-        // apart, which is why MacroStore's file format has to.
+        // codes on Windows. Both spaces pass this same 0 <= k < 256 filter
+        // while meaning entirely different keys; nothing this narrow can tell
+        // them apart, which is why MacroStore's file format has to.
         //
-        // The exclusion of 0 is load-bearing on macOS specifically: 0 is both
-        // the A key and HotkeyBinding.Unbound's sentinel for "no key" — see
-        // its remarks for why that collision isn't being fixed here.
-        Keys = keys.Where(k => k is > 0 and < 256).ToArray();
+        // 0 is included on purpose: it is the A key on macOS, and the
+        // sentinel for "no key" lives at -1 now (see HotkeyBinding.Unbound),
+        // so 0 no longer needs excluding here to keep the two apart.
+        Keys = keys.Where(k => k is >= 0 and < 256).ToArray();
         KeysText = keysText;
         IntervalMs = Math.Clamp(intervalMs, MinIntervalMs, MaxIntervalMs);
 
@@ -214,6 +214,35 @@ public sealed class MacroRunner : IDisposable
     /// </remarks>
     public IEnumerable<int> RunningKeys() => _running.Values.SelectMany(e => e.Macro.Keys);
 
+    /// <summary>
+    /// What the on-screen badge should say for each currently running macro.
+    /// </summary>
+    /// <remarks>
+    /// The keys, not an ordinary macro's own name — a badge that answers "why
+    /// is my F doing that" needs the thing being sent, not whatever its
+    /// author happened to call it, so this reads straight off each running
+    /// <see cref="KeyMacro"/>'s own <see cref="KeyMacro.KeysText"/>.
+    ///
+    /// The auto switcher (<see cref="SwitcherMacro.Name"/>) is the one
+    /// exception: it has no card of its own for two bare numbers to sit
+    /// beside, so its line names it explicitly rather than reading as an
+    /// anonymous macro nobody remembers creating.
+    ///
+    /// Read straight off <c>_running</c> rather than built from a
+    /// caller-supplied macro list, which is what makes this correct for the
+    /// switcher: its <see cref="KeyMacro"/> is rebuilt fresh by
+    /// <see cref="SwitcherMacro.Build"/> every time it starts (see that
+    /// type's remarks) and is never one of the macros kept in
+    /// <c>MacroStore</c>'s saved list, so nothing outside this runner has a
+    /// current copy to read <see cref="KeyMacro.KeysText"/> from.
+    /// </remarks>
+    public IReadOnlyList<string> BadgeLines() =>
+        _running.Values
+            .Select(e => (e.Macro.Name, Keys: e.Macro.KeysText.Trim()))
+            .Where(e => e.Keys.Length > 0)
+            .Select(e => e.Name == SwitcherMacro.Name ? $"Auto Switcher: {e.Keys}" : e.Keys)
+            .ToList();
+
     /// <summary>How many key presses have actually gone out.</summary>
     /// <remarks>
     /// Counts sends, not ticks. A macro that is running but suppressed reads
@@ -234,12 +263,16 @@ public sealed class MacroRunner : IDisposable
     /// Called on the macro thread, so whatever is behind it must be safe to
     /// call from anywhere.
     ///
-    /// Currently unassigned in this build: nothing sets this property, so it
-    /// always reads null and every macro sends unconditionally regardless of
-    /// what is focused. The Windows original wires it to a foreground-window
-    /// check; wiring the same thing here needs a macOS frontmost-window check,
-    /// which this port has not added. Do not assume a macro is suppressed
-    /// while some other window has focus until something sets this.
+    /// <c>MainWindow</c> wires this to a cached copy of Avalonia's
+    /// <c>Window.IsActive</c> — true exactly while this app's window has
+    /// focus, on both platforms — rather than a platform-specific
+    /// foreground-window check like the Windows original's. The cache exists
+    /// because <c>IsActive</c> itself is a UI property and must not be read
+    /// from this thread.
+    ///
+    /// The cycle still advances while a press is skipped (see the comment in
+    /// <see cref="Loop"/>): alt-tabbing away and back does not leave a macro
+    /// stuck resending the key it was on when suppression began.
     /// </remarks>
     public Func<bool>? Suppressed { get; set; }
 
@@ -612,14 +645,32 @@ public static class MacroStore
     /// </remarks>
     private const string PlatformTag = "macos";
 
+    /// <summary>
+    /// The version of this file's own shape — specifically, of what a stored
+    /// <see cref="StoredMacro.HotkeyCode"/> of 0 means.
+    /// </summary>
+    /// <remarks>
+    /// Same idea as <see cref="AppSettings.SchemaVersion"/>, applied to this
+    /// file instead: below <see cref="CurrentSchema"/>, a stored 0 means
+    /// unbound — the only meaning it ever had before A could be bound at all.
+    /// At or above it, 0 means the A key. <see cref="Load"/> migrates a file
+    /// below <see cref="CurrentSchema"/> once, rewriting every 0 to -1 and
+    /// saving immediately, so a macro nobody bound a toggle to never turns
+    /// into one silently bound to A.
+    /// </remarks>
+    private const int CurrentSchema = 1;
+
     private sealed class StoredMacro
     {
         public string Name { get; set; } = "";
         public int[] Keys { get; set; } = Array.Empty<int>();
         public string KeysText { get; set; } = "";
         public int IntervalMs { get; set; } = 100;
-        // Zero means unbound. Absent from files written before this feature
-        // shipped, which defaults them to unbound on load — no migration.
+        // 0 means unbound below CurrentSchema, and the A key at or above it —
+        // see CurrentSchema's remarks. Absent from files written before this
+        // field shipped at all, which defaults it to 0 on load; that reads as
+        // unbound the same way it always has, since a file that old is also
+        // below CurrentSchema and gets migrated to -1 like any other stored 0.
         public int HotkeyCode { get; set; }
         public string HotkeyName { get; set; } = "";
 
@@ -638,6 +689,9 @@ public static class MacroStore
     {
         [JsonPropertyName("platform")]
         public string? Platform { get; set; }
+
+        [JsonPropertyName("schemaVersion")]
+        public int SchemaVersion { get; set; }
 
         [JsonPropertyName("macros")]
         public List<StoredMacro> Macros { get; set; } = new();
@@ -673,14 +727,47 @@ public static class MacroStore
             // A file whose platform is missing or is anything other than this
             // build's own is treated as if it held no macros at all — never
             // partially loaded, never an error. See PlatformTag for why.
+            // Checked before the schema migration below so a foreign file is
+            // never rewritten on its way to being ignored.
             if (file.Platform != PlatformTag) return Defaults();
+
+            // See CurrentSchema's remarks: below it, every stored 0 still
+            // means unbound and is rewritten to -1 once, on the way in, and
+            // the file is saved immediately so this never runs again for it.
+            if (file.SchemaVersion < CurrentSchema)
+            {
+                foreach (StoredMacro m in file.Macros)
+                {
+                    if (m.HotkeyCode == 0) m.HotkeyCode = -1;
+                }
+
+                file.SchemaVersion = CurrentSchema;
+
+                try
+                {
+                    File.WriteAllText(MacrosFile,
+                        JsonSerializer.Serialize(file, new JsonSerializerOptions { WriteIndented = true }));
+                }
+                catch
+                {
+                    // A read-only file, a full disk, a lock — whatever it is,
+                    // it must not fall through to the outer catch below: that
+                    // would discard the macros already deserialized (and
+                    // migrated in memory) above, and the very next
+                    // MacroStore.Save would then overwrite the real file with
+                    // that empty list, making the loss permanent. Returning
+                    // the migrated macros here even though the persist failed
+                    // is safe because the migration is idempotent — this file
+                    // will just migrate again next launch.
+                }
+            }
 
             return file.Macros
                 .Where(m => !string.IsNullOrWhiteSpace(m.Name))
                 .Where(m => !IsLegacySwitcher(m.Name))
                 .Select(m => new KeyMacro(
                     m.Name, m.Keys, m.KeysText, m.IntervalMs,
-                    hotkey: m.HotkeyCode > 0 ? new HotkeyBinding(m.HotkeyCode, m.HotkeyName) : HotkeyBinding.Unbound,
+                    hotkey: m.HotkeyCode >= 0 ? new HotkeyBinding(m.HotkeyCode, m.HotkeyName) : HotkeyBinding.Unbound,
                     enabled: !m.Disabled))
                 .ToList();
         }
@@ -707,7 +794,7 @@ public static class MacroStore
                 })
                 .ToList();
 
-            var file = new StoredFile { Platform = PlatformTag, Macros = stored };
+            var file = new StoredFile { Platform = PlatformTag, SchemaVersion = CurrentSchema, Macros = stored };
 
             File.WriteAllText(MacrosFile,
                 JsonSerializer.Serialize(file, new JsonSerializerOptions { WriteIndented = true }));
@@ -822,34 +909,13 @@ public static class MacroStore
 
     /// <summary>
     /// The refusal shown for <see cref="TrapsOwnToggle"/>, in the same voice
-    /// as <see cref="UnbindableAMessage"/> and the plain "already the X key"
-    /// clash message: name the key, say why it can't be this, say what to do.
+    /// as the plain "already the X key" clash message: name the key, say why
+    /// it can't be this, say what to do.
     /// </summary>
     public static string OwnKeyTrapMessage(string hotkeyName) =>
         $"{hotkeyName} is one of this macro's own keys. A running macro swallows its own key "
         + "presses before any hotkey is checked, so this would start it but could never stop it. "
         + "Pick a hotkey the macro doesn't send, or drop that key from the macro.";
-
-    /// <summary>
-    /// A can't be bound on this build — see <see cref="HotkeyBinding.Unbound"/>
-    /// for why its own code doubles as "no key at all" on macOS. Shared by
-    /// every place that can hit it: a typed KEY box on the Macros page, a
-    /// captured toggle hotkey, a fixed hotkey, and a switcher slot.
-    /// </summary>
-    public const string UnbindableAMessage =
-        "A can't be bound on this build. Its key code doubles as this platform's \"no key\" marker, "
-        + "so the app can't tell a bound A from none at all — pick a different letter.";
-
-    /// <summary>Whether any comma/space-separated piece of typed text is the letter A.</summary>
-    /// <remarks>
-    /// Lets a caller tell "nothing usable was typed" apart from "the one
-    /// unbindable letter was typed", so it can show <see cref="UnbindableAMessage"/>
-    /// instead of a generic validation error that would be untrue of A
-    /// specifically.
-    /// </remarks>
-    public static bool MentionsUnbindableA(string? typed) =>
-        (typed ?? "").Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries)
-            .Any(piece => piece.Trim().Equals("A", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// Reads keys typed as "1, 2" or "R" into the running platform's own key

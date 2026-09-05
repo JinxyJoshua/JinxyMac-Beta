@@ -38,12 +38,34 @@ public class KeyMacroTests
         Assert.Equal(expected, new KeyMacro("M", new[] { 0x52 }, "R", given).IntervalMs);
     }
 
+    /// <summary>
+    /// 0 is kept, not dropped: it is the A key on macOS, and the sentinel for
+    /// "no key" lives at -1 now (HotkeyBinding.Unbound), not 0. Only a
+    /// negative code or one at/above 256 is out of range.
+    /// </summary>
     [Fact]
     public void DropsKeyCodesOutsideTheValidRange()
     {
         var macro = new KeyMacro("M", new[] { 0, 0x52, 300, -1 }, "R", 100);
 
-        Assert.Equal(new[] { 0x52 }, macro.Keys);
+        Assert.Equal(new[] { 0, 0x52 }, macro.Keys);
+    }
+
+    /// <summary>
+    /// A is a real, bindable key: KeyCodes.For('A') is 0 on macOS, and a
+    /// macro's own Keys filter (>= 0 and &lt; 256) admits it like any other
+    /// letter — this is the limitation the sentinel move exists to remove.
+    /// </summary>
+    [Fact]
+    public void AMacroCanBeBuiltWithAAsOneOfItsKeys()
+    {
+        int? a = KeyCodes.For('A');
+        Assert.NotNull(a);
+
+        var macro = new KeyMacro("Spam A", new[] { a!.Value }, "A", 100);
+
+        Assert.Equal(new[] { a.Value }, macro.Keys);
+        Assert.True(macro.IsUsable);
     }
 
     [Fact]
@@ -406,6 +428,154 @@ public class KeyMacroTests
         {
             Assert.Empty(MacroStore.Load());
         });
+    }
+
+    // ---- schema migration: 0 used to mean unbound, now means A ----
+    //
+    // Every macros.json already on disk was written before HotkeyCode had a
+    // schema version to go with it, so it deserializes with that version at
+    // its default, 0 — below MacroStore's current schema. Below that, a
+    // stored HotkeyCode of 0 must still load as unbound, the only meaning it
+    // ever had; at or above it, 0 is A. This is the same danger the task
+    // brief calls out for AppSettings, applied to the macro list instead:
+    // skipping the migration would read every macro nobody bound a toggle to
+    // as one silently bound to A.
+
+    /// <summary>A stored HotkeyCode of 0 below the current schema is unbound, not A.</summary>
+    [Fact]
+    public void APreSchemaMacroWithHotkeyCodeZeroLoadsUnbound()
+    {
+        WithMacrosFile(
+            """{"platform":"macos","macros":[{"Name":"Spam R","Keys":[82],"KeysText":"R","IntervalMs":120,"HotkeyCode":0,"HotkeyName":"Not set"}]}""",
+            () =>
+            {
+                KeyMacro only = Assert.Single(MacroStore.Load());
+                Assert.False(only.Hotkey.IsValid);
+                Assert.Equal(HotkeyBinding.Unbound, only.Hotkey);
+            });
+    }
+
+    /// <summary>
+    /// After that same load, the file on disk must hold -1 (not 0) and the
+    /// current schema — the migration is not just an in-memory reinterpretation,
+    /// it rewrites what is actually stored.
+    /// </summary>
+    [Fact]
+    public void MigratingAMacrosFileRewritesHotkeyCodeToMinusOneAndStampsTheSchema()
+    {
+        WithMacrosFile(
+            """{"platform":"macos","macros":[{"Name":"Spam R","Keys":[82],"KeysText":"R","IntervalMs":120,"HotkeyCode":0,"HotkeyName":"Not set"}]}""",
+            () =>
+            {
+                MacroStore.Load();
+
+                string raw = File.ReadAllText(MacrosFilePath);
+                using var doc = System.Text.Json.JsonDocument.Parse(raw);
+
+                Assert.Equal(-1, doc.RootElement.GetProperty("macros")[0].GetProperty("HotkeyCode").GetInt32());
+                Assert.True(doc.RootElement.GetProperty("schemaVersion").GetInt32() >= 1);
+            });
+    }
+
+    /// <summary>A file already at the current schema reads its own HotkeyCode of 0 as A.</summary>
+    [Fact]
+    public void AMacrosFileAlreadyAtTheCurrentSchemaWithHotkeyCodeZeroLoadsAsA()
+    {
+        WithMacrosFile(
+            """{"platform":"macos","schemaVersion":1,"macros":[{"Name":"Spam A","Keys":[0],"KeysText":"A","IntervalMs":120,"HotkeyCode":0,"HotkeyName":"A"}]}""",
+            () =>
+            {
+                KeyMacro only = Assert.Single(MacroStore.Load());
+                Assert.True(only.Hotkey.IsValid);
+                Assert.Equal(0, only.Hotkey.Code);
+                Assert.Equal("A", only.Hotkey.Name);
+            });
+    }
+
+    /// <summary>
+    /// Pins the exact regression this schema exists to prevent: a real A
+    /// binding (HotkeyCode 0) already at CurrentSchema must survive a second
+    /// load unchanged, both in memory and on disk. A future change that
+    /// migrated by value instead of by version (rewriting any stored 0, not
+    /// just ones below CurrentSchema) would turn this legitimate A binding
+    /// back into "unbound" the second time the file is read —
+    /// <see cref="LoadingAMacrosFileTwiceDoesNotDoubleMigrateOrLoseARealBinding"/>
+    /// only exercises this with code 15.
+    /// </summary>
+    [Fact]
+    public void LoadingAnAlreadyCurrentHotkeyCodeZeroMacroTwiceStillReadsAsABothTimes()
+    {
+        WithMacrosFile(
+            """{"platform":"macos","schemaVersion":1,"macros":[{"Name":"Spam A","Keys":[0],"KeysText":"A","IntervalMs":120,"HotkeyCode":0,"HotkeyName":"A"}]}""",
+            () =>
+            {
+                KeyMacro first = Assert.Single(MacroStore.Load());
+                Assert.True(first.Hotkey.IsValid);
+                Assert.Equal(0, first.Hotkey.Code);
+
+                KeyMacro second = Assert.Single(MacroStore.Load());
+                Assert.True(second.Hotkey.IsValid);
+                Assert.Equal(0, second.Hotkey.Code);
+
+                string raw = File.ReadAllText(MacrosFilePath);
+                using var doc = System.Text.Json.JsonDocument.Parse(raw);
+                Assert.Equal(0, doc.RootElement.GetProperty("macros")[0].GetProperty("HotkeyCode").GetInt32());
+                Assert.Equal(1, doc.RootElement.GetProperty("schemaVersion").GetInt32());
+            });
+    }
+
+    /// <summary>
+    /// Loading a pre-schema file twice must not migrate twice (which would
+    /// be harmless here, but is the general shape of the bug this guards) and
+    /// must not disturb a real, already-bound hotkey along the way.
+    /// </summary>
+    [Fact]
+    public void LoadingAMacrosFileTwiceDoesNotDoubleMigrateOrLoseARealBinding()
+    {
+        WithMacrosFile(
+            """{"platform":"macos","macros":[{"Name":"Spam R","Keys":[82],"KeysText":"R","IntervalMs":120,"HotkeyCode":15,"HotkeyName":"R"}]}""",
+            () =>
+            {
+                KeyMacro first = Assert.Single(MacroStore.Load());
+                Assert.Equal(15, first.Hotkey.Code);
+
+                KeyMacro second = Assert.Single(MacroStore.Load());
+                Assert.Equal(15, second.Hotkey.Code);
+
+                string raw = File.ReadAllText(MacrosFilePath);
+                using var doc = System.Text.Json.JsonDocument.Parse(raw);
+                Assert.Equal(1, doc.RootElement.GetProperty("schemaVersion").GetInt32());
+            });
+    }
+
+    /// <summary>
+    /// If the migration write inside Load() throws — a read-only file, a full
+    /// disk, a lock — that must not discard the macros already deserialized
+    /// and migrated in memory. The old behavior fell into the outer catch and
+    /// returned an empty list, and the next Save() would then overwrite the
+    /// real file with it, permanently losing every macro.
+    /// </summary>
+    [Fact]
+    public void AFailedMigrationWriteStillReturnsTheMigratedMacros()
+    {
+        WithMacrosFile(
+            """{"platform":"macos","macros":[{"Name":"Spam R","Keys":[82],"KeysText":"R","IntervalMs":120,"HotkeyCode":15,"HotkeyName":"R"}]}""",
+            () =>
+            {
+                File.SetAttributes(MacrosFilePath, FileAttributes.ReadOnly);
+                try
+                {
+                    List<KeyMacro> loaded = MacroStore.Load();
+
+                    KeyMacro only = Assert.Single(loaded);
+                    Assert.Equal("Spam R", only.Name);
+                    Assert.Equal(15, only.Hotkey.Code);
+                }
+                finally
+                {
+                    File.SetAttributes(MacrosFilePath, FileAttributes.Normal);
+                }
+            });
     }
 
     // ---- the write half ----

@@ -126,7 +126,7 @@ public partial class MainWindow
     {
         if (_rebinding) return;
 
-        _settings.SwitcherHotkeyCode = 0;
+        _settings.SwitcherHotkeyCode = -1;
         _settings.SwitcherHotkeyName = HotkeyBinding.Unbound.Name;
         SwitcherHotkeyButton.Content = HotkeyBinding.Unbound.Name;
 
@@ -220,7 +220,8 @@ public partial class MainWindow
                 ? $" Raised from {holdFirst.Value} to {result.FirstHoldMs} ms: any shorter draws the "
                   + "weapon and swaps away before it fires."
                 : "")
-            + " It goes to whatever window is focused, so switch to the game now.";
+            + " It is held back while this window is in front — switch to the game and it starts"
+            + " landing there, then wherever else is focused after that.";
 
         RefreshSwitcherCard();
     }

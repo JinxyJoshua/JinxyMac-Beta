@@ -31,6 +31,9 @@ public sealed class WindowsHotkeyWatcher : IHotkeyWatcher
 
     public event Action<int>? Released;
 
+    // Deliberately still > 0, unlike the macOS watcher's Bindable: virtual-key
+    // code 0 is not a key on Windows, and KeyCodes.For never produces it on
+    // this platform, so there is no A-shaped reason to admit it here.
     public void Watch(IEnumerable<int> codes) =>
         _watched = codes.Where(c => c is > 0 and < 256).Distinct().ToArray();
 
