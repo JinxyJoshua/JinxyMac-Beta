@@ -235,6 +235,7 @@
                     <RadioButton Classes="nav" GroupName="Nav" Content="Theme" Name="NavTheme"/>
                     <RadioButton Classes="nav" GroupName="Nav" Content="Settings" Name="NavSettings"/>
                     <RadioButton Classes="nav" GroupName="Nav" Content="Kit Wheel" Name="NavKitWheel"/>
+                    <RadioButton Classes="nav" GroupName="Nav" Content="Macros" Name="NavMacros"/>
                 </StackPanel>
 
                 <TextBlock DockPanel.Dock="Bottom" Name="EngineNote"
@@ -1401,6 +1402,89 @@
                                     <TextBlock Name="KitEmptyText" Classes="hint"
                                                Text="No kits on the roster. Type one above and press Add kit."/>
                                 </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- Macros: any key, any rate, as many as you like. -->
+                    <StackPanel Name="PageMacros" IsVisible="False">
+
+                        <Border Classes="card">
+                            <DockPanel LastChildFill="False">
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="HOTKEYS" Classes="label"/>
+                                    <TextBlock Name="MacrosHotkeyNote" Classes="hint"
+                                               Text="Every bound key is live. Turn them off while you edit."/>
+                                    <TextBlock Name="MacroHotkeyNoticeText" Classes="hint" IsVisible="False"
+                                               Foreground="{DynamicResource Accent}"/>
+                                </StackPanel>
+                                <Button Name="MacrosHotkeyKill" DockPanel.Dock="Right" Content="DISABLE HOTKEYS"
+                                        Height="40" MinWidth="170" Padding="16,0" FontWeight="Bold"
+                                        VerticalAlignment="Center"/>
+                            </DockPanel>
+                        </Border>
+
+                        <Border Classes="card">
+                            <StackPanel>
+                                <DockPanel LastChildFill="False">
+                                    <TextBlock Text="RUNNING" Classes="label" VerticalAlignment="Center"/>
+                                    <Button Name="StopAllMacrosButton" DockPanel.Dock="Right"
+                                            Content="Stop all" Padding="14,6" FontSize="11"/>
+                                </DockPanel>
+                                <TextBlock Name="MacroRunningText" Text="Nothing running."
+                                           Classes="hint" Margin="0,8,0,0"/>
+                                <TextBlock Classes="hint" Margin="0,6,0,0"
+                                           Text="A macro types a key over and over while it is on. It goes to whatever window is in front, so switch to the game before starting one."/>
+                            </StackPanel>
+                        </Border>
+
+                        <ItemsControl Name="MacroList" Margin="0,0,0,14">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+
+                        <Border Classes="card">
+                            <StackPanel>
+                                <TextBlock Text="NEW MACRO" Classes="label"/>
+                                <TextBlock Classes="hint"
+                                           Text="One letter or digit per box. Fill the second and the macro alternates between the two; leave it empty and it just spams the first."/>
+
+                                <Grid Margin="0,14,0,0"
+                                      ColumnDefinitions="*,10,80,10,110,10,110,10,90,10,Auto">
+                                    <StackPanel Grid.Column="0">
+                                        <TextBox Name="MacroNameBox" Watermark="Name"/>
+                                        <TextBlock Text="NAME" Classes="tiny" Margin="0,6,0,0"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBox Name="MacroKey1Box" MaxLength="1"/>
+                                        <TextBlock Text="KEY" Classes="tiny" Margin="0,6,0,0"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="4">
+                                        <TextBox Name="MacroKey2Box" MaxLength="1"/>
+                                        <TextBlock Text="2ND KEY (OPTIONAL)" Classes="tiny" Margin="0,6,0,0"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="6">
+                                        <Button Name="NewMacroHotkeyButton" Content="Not set"
+                                                Height="34" Padding="12,0" HorizontalAlignment="Stretch"
+                                                HorizontalContentAlignment="Center"
+                                                ToolTip.Tip="Click, then press a key or mouse side button"/>
+                                        <TextBlock Text="TOGGLE HOTKEY (OPTIONAL)" Classes="tiny" Margin="0,6,0,0"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="8">
+                                        <TextBox Name="MacroIntervalBox" Text="100"/>
+                                        <TextBlock Text="EVERY (MS)" Classes="tiny" Margin="0,6,0,0"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="10" Name="SaveMacroButton" Content="+ Save"
+                                            Classes="accent" Height="34" Padding="20,0"
+                                            VerticalAlignment="Top"/>
+                                </Grid>
+
+                                <TextBlock Name="MacroErrorText" IsVisible="False"
+                                           Foreground="{DynamicResource Accent}" Classes="hint"
+                                           Margin="0,10,0,0"/>
                             </StackPanel>
                         </Border>
                     </StackPanel>

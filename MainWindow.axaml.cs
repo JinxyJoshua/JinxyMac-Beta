@@ -130,6 +130,7 @@ public partial class MainWindow : Window
         WireHistory();
         WirePresets();
         WireKitWheel();
+        WireMacros();
         WireTheme();
         WireSettings();
         WireCache();
@@ -200,6 +201,7 @@ public partial class MainWindow : Window
         Wire(NavTheme, PageTheme, "Theme", "Accent colour");
         Wire(NavSettings, PageSettings, "Settings", "Where things are stored, and what this build can do");
         Wire(NavKitWheel, PageKitWheel, "Kit Wheel", "Roll a kit you have not played yet");
+        Wire(NavMacros, PageMacros, "Macros", "Spam a key, or cycle a few");
 
         void Wire(RadioButton button, Control page, string title, string subtitle) =>
             button.IsCheckedChanged += (_, _) =>
@@ -217,6 +219,7 @@ public partial class MainWindow : Window
         PageTheme.IsVisible = ReferenceEquals(page, PageTheme);
         PageSettings.IsVisible = ReferenceEquals(page, PageSettings);
         PageKitWheel.IsVisible = ReferenceEquals(page, PageKitWheel);
+        PageMacros.IsVisible = ReferenceEquals(page, PageMacros);
 
         PageTitleText.Text = title;
         PageSubtitleText.Text = subtitle;
@@ -241,6 +244,8 @@ public partial class MainWindow : Window
             OpenKitListIfNothingPicked();
             _ = FetchMissingKitArtAsync();
         }
+
+        if (ReferenceEquals(page, PageMacros)) EnsureMacrosBuilt();
     }
 
     // ---- clicker ----
@@ -802,6 +807,7 @@ public partial class MainWindow : Window
         else if (code == _settings.BuildCode) ToggleBuilding();
         else if (code == _settings.RecordCode) _ = ToggleRecording();
         else if (code == _settings.ReplayCode) _ = SaveReplay();
+        else if (MacroWithHotkey(code) is KeyMacro macro) ToggleMacroHotkey(macro);
     }
 
     /// <summary>Stops the clicker when the held key comes back up.</summary>
@@ -902,16 +908,27 @@ public partial class MainWindow : Window
     {
         bool on = HotkeysEnabled.IsChecked == true;
 
+        // Macros bring their own toggle hotkeys into the same watch list —
+        // one watcher for every bindable key rather than a second mechanism
+        // polling alongside it. A disabled macro's key is left out entirely
+        // rather than watched-and-ignored, so it stays free for anything else
+        // while the macro it would have toggled cannot be started at all.
         _hotkeys.Watch(on
             ? new[]
             {
                 _settings.HotkeyCode, _settings.ComboCode, _settings.BuildCode,
                 _settings.RecordCode, _settings.ReplayCode
-            }
+            }.Concat(MacroHotkeyCodes())
             : Array.Empty<int>());
+
+        // Nothing may keep running once the only switch that could stop it is
+        // greyed out. The macro cards disable their own toggle for the same
+        // reason — see RefreshMacroCards.
+        if (!on) _macros.StopAll();
 
         RefreshHotkeySummary();
         RefreshStatus();
+        RefreshMacroCards();
 
         if (_loading) return;
 
