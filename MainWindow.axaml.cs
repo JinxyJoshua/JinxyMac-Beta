@@ -129,6 +129,7 @@ public partial class MainWindow : Window
         WireRecorder();
         WireHistory();
         WirePresets();
+        WireKitWheel();
         WireTheme();
         WireSettings();
         WireCache();
@@ -162,6 +163,11 @@ public partial class MainWindow : Window
             // and the stop is graceful precisely to avoid that.
             HideTray();
 
+            // Stops a kit-art fetch still running against the wiki from
+            // outliving the window it was fetching pictures for.
+            _kitArtCts.Cancel();
+            _kitArtCts.Dispose();
+
             _recorder.Dispose();
             _replay.Dispose();
             _macros.Dispose();
@@ -185,6 +191,7 @@ public partial class MainWindow : Window
         Wire(NavHistory, PageHistory, "History", "Time spent clicking, and how much of it landed");
         Wire(NavTheme, PageTheme, "Theme", "Accent colour");
         Wire(NavSettings, PageSettings, "Settings", "Where things are stored, and what this build can do");
+        Wire(NavKitWheel, PageKitWheel, "Kit Wheel", "Roll a kit you have not played yet");
 
         void Wire(RadioButton button, Control page, string title, string subtitle) =>
             button.IsCheckedChanged += (_, _) =>
@@ -201,6 +208,7 @@ public partial class MainWindow : Window
         PageHistory.IsVisible = ReferenceEquals(page, PageHistory);
         PageTheme.IsVisible = ReferenceEquals(page, PageTheme);
         PageSettings.IsVisible = ReferenceEquals(page, PageSettings);
+        PageKitWheel.IsVisible = ReferenceEquals(page, PageKitWheel);
 
         PageTitleText.Text = title;
         PageSubtitleText.Text = subtitle;
@@ -214,6 +222,16 @@ public partial class MainWindow : Window
         // the clicker runs, and redrawing sixty rows a second to show a page
         // nobody is looking at is work for nothing.
         if (ReferenceEquals(page, PageHistory)) RefreshHistory();
+
+        // Opening the kit list on a first-ever visit, and pulling down any
+        // pictures this install has not got, both belong to arriving on the
+        // page rather than to launch — someone who never opens it never
+        // spends the bandwidth.
+        if (ReferenceEquals(page, PageKitWheel))
+        {
+            OpenKitListIfNothingPicked();
+            _ = FetchMissingKitArtAsync();
+        }
     }
 
     // ---- clicker ----

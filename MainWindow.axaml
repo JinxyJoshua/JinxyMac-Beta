@@ -234,6 +234,7 @@
                     <RadioButton Classes="nav" GroupName="Nav" Content="History" Name="NavHistory"/>
                     <RadioButton Classes="nav" GroupName="Nav" Content="Theme" Name="NavTheme"/>
                     <RadioButton Classes="nav" GroupName="Nav" Content="Settings" Name="NavSettings"/>
+                    <RadioButton Classes="nav" GroupName="Nav" Content="Kit Wheel" Name="NavKitWheel"/>
                 </StackPanel>
 
                 <TextBlock DockPanel.Dock="Bottom" Name="EngineNote"
@@ -1203,6 +1204,203 @@
                                 <TextBlock Text="ABOUT" Foreground="{DynamicResource TextMuted}"
                                            FontSize="10" FontWeight="Bold"/>
                                 <TextBlock Name="AboutText" Classes="hint"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- Kit Wheel -->
+                    <StackPanel Name="PageKitWheel" IsVisible="False">
+
+                        <!-- The reveal. One panel that swaps between asking and
+                             answering, so the roll always lands where the eye
+                             already is. -->
+                        <Border Classes="card">
+                            <StackPanel>
+                                <DockPanel LastChildFill="False">
+                                    <TextBlock Text="KIT ROLL" Classes="label"/>
+                                    <TextBlock Name="KitsRemainingText" DockPanel.Dock="Right"
+                                               Text="0 KITS REMAINING" Classes="tiny"
+                                               VerticalAlignment="Center"/>
+                                </DockPanel>
+
+                                <Border Background="{DynamicResource Sunken}" CornerRadius="10"
+                                        Height="220" Margin="0,14,0,0">
+                                    <Grid Name="RevealPanel">
+                                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                            <TextBlock Name="RollBadgeText" Text="KIT ROLL"
+                                                       HorizontalAlignment="Center" FontSize="11"
+                                                       FontWeight="Bold" Foreground="{DynamicResource Accent}"/>
+
+                                            <!-- Two identical layers, one fading into the other, so
+                                                 the reel dissolves from kit to kit rather than
+                                                 flashing between them. -->
+                                            <Grid Name="ReelStack" Height="140" Margin="0,10,0,0"
+                                                  IsVisible="False">
+                                                <StackPanel Name="ReelLayerA">
+                                                    <Border Width="92" Height="92" CornerRadius="8"
+                                                            ClipToBounds="True" HorizontalAlignment="Center"
+                                                            Background="{DynamicResource Panel2}">
+                                                        <Image Name="ReelImageA" Stretch="UniformToFill"/>
+                                                    </Border>
+                                                    <TextBlock Name="ReelNameA" HorizontalAlignment="Center"
+                                                               Margin="0,8,0,0" FontSize="26" FontWeight="Bold"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               Foreground="{DynamicResource TextBright}"/>
+                                                </StackPanel>
+
+                                                <StackPanel Name="ReelLayerB" Opacity="0">
+                                                    <Border Width="92" Height="92" CornerRadius="8"
+                                                            ClipToBounds="True" HorizontalAlignment="Center"
+                                                            Background="{DynamicResource Panel2}">
+                                                        <Image Name="ReelImageB" Stretch="UniformToFill"/>
+                                                    </Border>
+                                                    <TextBlock Name="ReelNameB" HorizontalAlignment="Center"
+                                                               Margin="0,8,0,0" FontSize="26" FontWeight="Bold"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               Foreground="{DynamicResource TextBright}"/>
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <!-- The states with no kit behind them: READY, ALL DONE,
+                                                 GET STARTED. -->
+                                            <TextBlock Name="RollHeadlineText" Text="READY?"
+                                                       HorizontalAlignment="Center" Margin="0,10,0,0"
+                                                       FontSize="34" FontWeight="Bold"
+                                                       Foreground="{DynamicResource TextBright}"/>
+                                            <TextBlock Name="RollSubText" Text="Press roll to begin"
+                                                       HorizontalAlignment="Center" Margin="0,8,0,0"
+                                                       FontSize="12" Foreground="{DynamicResource TextMuted}"/>
+
+                                            <!-- How far through the reel it is, so the spin has a
+                                                 visible end rather than stopping whenever it feels
+                                                 like it. -->
+                                            <ProgressBar Name="ReelBar" Height="4" Width="240"
+                                                         Minimum="0" Maximum="1" Value="0"
+                                                         Margin="0,14,0,0" BorderThickness="0"
+                                                         Background="{DynamicResource Track}"
+                                                         Foreground="{DynamicResource Accent}"
+                                                         IsVisible="False"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+
+                                <Button Name="RollButton" Content="ROLL KIT" Classes="accent"
+                                        Height="46" Margin="0,16,0,0" FontSize="15" FontWeight="Bold"
+                                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+
+                                <DockPanel LastChildFill="False" Margin="0,18,0,0">
+                                    <TextBlock Text="CHALLENGE PROGRESS" Classes="tiny"/>
+                                    <TextBlock Name="ChallengeProgressText" DockPanel.Dock="Right"
+                                               Text="0 / 0" FontSize="11" FontWeight="Bold"
+                                               Foreground="{DynamicResource Accent}"/>
+                                </DockPanel>
+
+                                <ProgressBar Name="ChallengeProgressBar" Height="6"
+                                             Minimum="0" Maximum="1" Value="0" Margin="0,8,0,0"
+                                             BorderThickness="0"
+                                             Background="{DynamicResource Track}"
+                                             Foreground="{DynamicResource Accent}"/>
+
+                                <Button Name="ResetRunButton" Content="Start a new run"
+                                        Height="34" Width="150" Margin="0,14,0,0"
+                                        HorizontalAlignment="Left"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card">
+                            <StackPanel>
+                                <TextBlock Text="SAVED WHEELS" Classes="label"/>
+                                <TextBlock Classes="hint" TextWrapping="Wrap"
+                                           Text="Keep a set of kits under a name and bring it back later. Click a wheel to load it."/>
+
+                                <Grid ColumnDefinitions="*,10,Auto" Margin="0,14,0,0">
+                                    <TextBox Grid.Column="0" Name="WheelNameBox" Watermark="Name this wheel"/>
+                                    <Button Grid.Column="2" Name="SaveWheelButton" Content="Save this wheel"
+                                            Padding="16,7"/>
+                                </Grid>
+
+                                <TextBlock Name="WheelHintText" Classes="hint" IsVisible="False"
+                                           Foreground="{DynamicResource Accent}"/>
+
+                                <ItemsControl Name="WheelList" Margin="0,14,0,0">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                </ItemsControl>
+
+                                <TextBlock Name="WheelEmptyText" Classes="hint"
+                                           Text="No saved wheels yet. Pick some kits, name them above and save."/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card">
+                            <StackPanel>
+                                <!-- The whole row is the control, so the summary and the chevron
+                                     are both part of what you click. -->
+                                <Button Name="KitListToggle" Background="{DynamicResource ControlAlt}"
+                                        BorderThickness="0" CornerRadius="8"
+                                        HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Stretch"
+                                        Padding="14,13">
+                                    <DockPanel LastChildFill="True">
+                                        <TextBlock Name="KitListChevron" DockPanel.Dock="Left" Text="▸"
+                                                   Foreground="{DynamicResource Accent}" FontSize="16"
+                                                   FontWeight="Bold" Margin="0,0,11,0"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBlock Text="PICK YOUR KITS" DockPanel.Dock="Left"
+                                                   Foreground="{DynamicResource TextBright}" FontSize="14"
+                                                   FontWeight="Bold" VerticalAlignment="Center"/>
+                                        <TextBlock Name="KitCountText" DockPanel.Dock="Right"
+                                                   Text="0 selected" Foreground="{DynamicResource Accent}"
+                                                   FontSize="11" FontWeight="Bold"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBlock Name="KitSelectionText" Text="Nothing picked yet"
+                                                   Foreground="{DynamicResource TextDim}" FontSize="11"
+                                                   TextTrimming="CharacterEllipsis" Margin="16,0,12,0"
+                                                   VerticalAlignment="Center"/>
+                                    </DockPanel>
+                                </Button>
+
+                                <StackPanel Name="KitListBody" IsVisible="False" Margin="0,14,0,0">
+                                    <TextBlock Classes="hint"
+                                               Text="Tick the kits you want on the wheel. Saved as you go. Right-click a tile to give it its own picture."/>
+
+                                    <Grid ColumnDefinitions="Auto,*" Margin="0,12,0,0">
+                                        <TextBlock Grid.Column="0" Text="SEARCH" Classes="tiny"
+                                                   VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                        <TextBox Grid.Column="1" Name="KitSearchBox" Watermark="Search kits"/>
+                                    </Grid>
+
+                                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                        <Button Name="SelectAllKitsButton" Content="Select all" Padding="12,6"/>
+                                        <Button Name="ClearKitsButton" Content="Clear" Padding="12,6"
+                                                Margin="8,0,0,0"/>
+                                        <TextBox Name="KitNameBox" Width="170" Margin="16,0,0,0"
+                                                 Watermark="Add a kit"/>
+                                        <Button Name="AddKitButton" Content="Add kit" Padding="12,6"
+                                                Margin="8,0,0,0"/>
+                                    </StackPanel>
+
+                                    <TextBlock Name="KitAddHintText" Classes="hint" IsVisible="False"
+                                               Foreground="{DynamicResource Accent}"/>
+                                    <TextBlock Name="KitPictureStatusText" Classes="hint" IsVisible="False"
+                                               Foreground="{DynamicResource Accent}"/>
+
+                                    <ScrollViewer MaxHeight="290" Margin="0,14,0,0">
+                                        <ItemsControl Name="KitList">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <WrapPanel/>
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+
+                                    <TextBlock Name="KitEmptyText" Classes="hint"
+                                               Text="No kits on the roster. Type one above and press Add kit."/>
+                                </StackPanel>
                             </StackPanel>
                         </Border>
                     </StackPanel>
