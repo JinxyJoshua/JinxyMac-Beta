@@ -35,6 +35,8 @@
     <Compile Include="../Capture/CaptureBackend.Tests.cs" />
     <Compile Include="../Core/RemoteConfig.cs" />
     <Compile Include="../Core/RemoteConfig.Tests.cs" />
+    <Compile Include="../Core/ClickButton.cs" />
+    <Compile Include="../Core/ClickButton.Tests.cs" />
     <!-- Pulled in as dependencies of the above, not tested directly. -->
     <Compile Include="../Core/SettingsPath.cs" />
     <Compile Include="../Capture/Ffmpeg.cs" />
