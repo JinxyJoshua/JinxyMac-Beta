@@ -94,7 +94,25 @@ public static class Wallpaper
 
         // A bare name is what gets stored. Anything carrying a directory came
         // from a hand-edited settings file and is not followed.
-        if (storedName != Path.GetFileName(storedName)) return null;
+        //
+        // The forward-slash and backslash checks are written out by hand
+        // instead of leaning on Path.GetFileName alone because that method's
+        // idea of a separator is platform-dependent: on Windows a backslash
+        // splits a directory from a name, but on macOS — the platform this
+        // app ships to — it is just another character, so a value like
+        // C:\Windows\System32\config or a UNC share sails through unchanged.
+        // A guard that only holds on the platform it was written on, and not
+        // the one it runs on, is not a guard. Path.IsPathRooted and the
+        // GetFileName comparison stay too, to catch whatever a rooted path
+        // on either platform's own convention slips past the two literal
+        // checks.
+        if (storedName.Contains('/') ||
+            storedName.Contains('\\') ||
+            Path.IsPathRooted(storedName) ||
+            storedName != Path.GetFileName(storedName))
+        {
+            return null;
+        }
 
         try
         {

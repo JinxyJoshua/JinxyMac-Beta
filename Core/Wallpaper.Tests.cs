@@ -64,12 +64,20 @@ public class WallpaperTests
 
     /// <summary>
     /// A bare name is what gets stored. Anything carrying a directory came from
-    /// a hand-edited settings file and is not followed.
+    /// a hand-edited settings file and is not followed. The backslash cases
+    /// matter as much as the forward-slash ones: this app ships to macOS,
+    /// where a backslash is just an ordinary filename character, so a guard
+    /// that only recognizes it as a separator on Windows would refuse these
+    /// on the platform it was written on and wave them through on the one it
+    /// runs on. Path.GetFileName alone does not refuse them on both — it has
+    /// to be checked by hand.
     /// </summary>
     [Theory]
     [InlineData("../../../etc/passwd")]
     [InlineData(@"C:\Windows\System32\config")]
     [InlineData("sub/wallpaper.png")]
+    [InlineData(@"sub\wallpaper.png")]
+    [InlineData(@"\\server\share\evil.png")]
     public void APathIsNotFollowed(string stored)
     {
         Assert.Null(Wallpaper.Resolve(stored));
