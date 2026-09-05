@@ -40,6 +40,8 @@
     <Compile Include="../Core/Wallpaper.cs" />
     <Compile Include="../Core/Wallpaper.Tests.cs" />
     <Compile Include="../Core/HotkeyBinding.cs" />
+    <Compile Include="../Core/KeyCodes.cs" />
+    <Compile Include="../Core/KeyCodes.Tests.cs" />
     <Compile Include="../Core/KeyMacro.cs" />
     <Compile Include="../Core/KeyMacro.Tests.cs" />
     <Compile Include="../Core/KeyMacroDwell.Tests.cs" />

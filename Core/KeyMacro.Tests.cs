@@ -77,7 +77,10 @@ public class KeyMacroTests
     {
         (int[] keys, string text) = MacroStore.ParseKeys("R")!.Value;
 
-        Assert.Equal(new[] { (int)'R' }, keys);
+        // Not (int)'R': that's the Windows virtual-key code by coincidence
+        // and the wrong assertion everywhere else. KeyCodes.For is what
+        // ParseKeys is actually supposed to produce.
+        Assert.Equal(new[] { KeyCodes.For('R')!.Value }, keys);
         Assert.Equal("R", text);
     }
 
@@ -90,7 +93,7 @@ public class KeyMacroTests
     {
         (int[] keys, _) = MacroStore.ParseKeys(typed)!.Value;
 
-        Assert.Equal(new[] { (int)'1', (int)'2' }, keys);
+        Assert.Equal(new[] { KeyCodes.For('1')!.Value, KeyCodes.For('2')!.Value }, keys);
     }
 
     [Fact]

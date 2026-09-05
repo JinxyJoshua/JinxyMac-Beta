@@ -34,6 +34,10 @@ public sealed class KeyMacro
         // codes on Windows. Both spaces pass this same 0 < k < 256 filter while
         // meaning entirely different keys; nothing this narrow can tell them
         // apart, which is why MacroStore's file format has to.
+        //
+        // The exclusion of 0 is load-bearing on macOS specifically: 0 is both
+        // the A key and HotkeyBinding.Unbound's sentinel for "no key" — see
+        // its remarks for why that collision isn't being fixed here.
         Keys = keys.Where(k => k is > 0 and < 256).ToArray();
         KeysText = keysText;
         IntervalMs = Math.Clamp(intervalMs, MinIntervalMs, MaxIntervalMs);
@@ -699,13 +703,18 @@ public static class MacroStore
     }
 
     /// <summary>
-    /// Reads keys typed as "1, 2" or "R" into virtual key codes.
+    /// Reads keys typed as "1, 2" or "R" into the running platform's own key
+    /// codes.
     /// </summary>
     /// <remarks>
     /// Letters and digits only, which covers every hotbar slot and every action
     /// key in the game this is for. Accepting the whole keyboard would mean
     /// parsing "Left Shift" and deciding what a macro that holds a modifier
     /// even means.
+    ///
+    /// "The platform's own key codes", not "virtual key codes" — Windows and
+    /// macOS number the same keys differently (see <see cref="KeyCodes"/>),
+    /// and this used to say the Windows-only name for what it produces.
     /// </remarks>
     public static (int[] Keys, string Text)? ParseKeys(string? typed)
     {
@@ -730,7 +739,9 @@ public static class MacroStore
 
             if (!char.IsLetterOrDigit(c)) return null;
 
-            keys.Add(c);
+            if (KeyCodes.For(c) is not int code) return null;
+
+            keys.Add(code);
             names.Add(one);
         }
 

@@ -45,6 +45,9 @@ public sealed class MacKeyEngine : IKeyEngine
 
     private static void Post(int code, bool down)
     {
+        // code <= 0 also excludes 0, which is both the A key and
+        // HotkeyBinding.Unbound's sentinel for "no key" — see its remarks
+        // for why that collision isn't being fixed here.
         if (code <= 0 || code > ushort.MaxValue) return;
 
         IntPtr key = IntPtr.Zero;
