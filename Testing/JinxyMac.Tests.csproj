@@ -48,6 +48,8 @@
     <Compile Include="../Core/KeyMacroDwell.Tests.cs" />
     <Compile Include="../Core/KeyMacroWait.Tests.cs" />
     <Compile Include="../Core/MacroRunner.Tests.cs" />
+    <Compile Include="../Core/SwitcherMacro.cs" />
+    <Compile Include="../Core/SwitcherMacro.Tests.cs" />
     <!-- Pulled in as dependencies of the above, not tested directly. -->
     <Compile Include="../Core/SettingsPath.cs" />
     <Compile Include="../Capture/Ffmpeg.cs" />

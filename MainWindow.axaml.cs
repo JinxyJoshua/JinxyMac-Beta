@@ -131,6 +131,7 @@ public partial class MainWindow : Window
         WirePresets();
         WireKitWheel();
         WireMacros();
+        WireSwitcher();
         WireTheme();
         WireSettings();
         WireCache();
@@ -202,6 +203,7 @@ public partial class MainWindow : Window
         Wire(NavSettings, PageSettings, "Settings", "Where things are stored, and what this build can do");
         Wire(NavKitWheel, PageKitWheel, "Kit Wheel", "Roll a kit you have not played yet");
         Wire(NavMacros, PageMacros, "Macros", "Spam a key, or cycle a few");
+        Wire(NavSwitcher, PageSwitcher, "Auto Switcher", "Swap between two hotbar slots");
 
         void Wire(RadioButton button, Control page, string title, string subtitle) =>
             button.IsCheckedChanged += (_, _) =>
@@ -220,6 +222,7 @@ public partial class MainWindow : Window
         PageSettings.IsVisible = ReferenceEquals(page, PageSettings);
         PageKitWheel.IsVisible = ReferenceEquals(page, PageKitWheel);
         PageMacros.IsVisible = ReferenceEquals(page, PageMacros);
+        PageSwitcher.IsVisible = ReferenceEquals(page, PageSwitcher);
 
         PageTitleText.Text = title;
         PageSubtitleText.Text = subtitle;
@@ -246,6 +249,8 @@ public partial class MainWindow : Window
         }
 
         if (ReferenceEquals(page, PageMacros)) EnsureMacrosBuilt();
+
+        if (ReferenceEquals(page, PageSwitcher)) RefreshSwitcherCard();
     }
 
     // ---- clicker ----
@@ -471,16 +476,53 @@ public partial class MainWindow : Window
         foreach (Action render in _readouts) render();
     }
 
+    /// <summary>
+    /// Everywhere the clicker's own stop paths converge: the ordinary hotkey
+    /// and the Start/Stop button and a hold-mode release (all through
+    /// <see cref="Toggle"/>), the combined shake hotkey (<see cref="ToggleCombo"/>,
+    /// which calls <see cref="Toggle"/> too), and the building hotkey
+    /// (<see cref="ToggleBuilding"/>).
+    /// </summary>
+    /// <remarks>
+    /// The auto switcher is a <see cref="KeyMacro"/> under its own reserved
+    /// name (see <see cref="SwitcherMacro.Name"/>), run by the same
+    /// <see cref="_macros"/> every other macro answers to — so the master hotkey kill, the Stop All
+    /// button, and closing the window already clear it for free, the same way
+    /// they already clear every other macro. What none of those already
+    /// touched is the clicker's own stop: before the switcher existed nothing
+    /// that stopped the clicker had any reason to know macros existed at all.
+    ///
+    /// That gap is exactly the bug the Windows build's history warns about:
+    /// the switcher is a latch of its own, so every stop that was not its own
+    /// hotkey used to leave it running, still swapping weapons with nothing
+    /// left clicking — worse than useless mid-fight. This is the one place
+    /// the clicker's own stops already meet (Toggle and ToggleBuilding used to
+    /// repeat the same three lines separately, which is what made it easy for
+    /// one of them to forget something the other did), so it is the one place
+    /// this needs adding rather than three.
+    ///
+    /// Flips the checkbox rather than stopping the macro directly, for the
+    /// same reason <c>SwitcherEnabled</c>'s own change handler exists: the
+    /// page and the runner must not be able to disagree about whether the
+    /// switcher is running.
+    /// </remarks>
+    private void StopClicker()
+    {
+        _building = false;
+        _clicker.Stop();
+
+        // A session's worth of totals reaches the disk when the session
+        // ends, rather than once a second while it runs.
+        FlushHistory();
+
+        SwitcherEnabled.IsChecked = false;
+    }
+
     private void Toggle()
     {
         if (_clicker.IsRunning)
         {
-            _building = false;
-            _clicker.Stop();
-
-            // A session's worth of totals reaches the disk when the session
-            // ends, rather than once a second while it runs.
-            FlushHistory();
+            StopClicker();
         }
         else
         {
@@ -773,6 +815,12 @@ public partial class MainWindow : Window
             _settings.ReplayName = name;
         });
 
+        Bind(SwitcherHotkeyButton, "switcher", (code, name) =>
+        {
+            _settings.SwitcherHotkeyCode = code;
+            _settings.SwitcherHotkeyName = name;
+        });
+
         BuildRateText.Text =
             $"Fixed {Clicker.BuildCps:0} CPS at {Clicker.BuildDuty * 100:0}% — Ignores the sliders";
     }
@@ -807,6 +855,7 @@ public partial class MainWindow : Window
         else if (code == _settings.BuildCode) ToggleBuilding();
         else if (code == _settings.RecordCode) _ = ToggleRecording();
         else if (code == _settings.ReplayCode) _ = SaveReplay();
+        else if (code == _settings.SwitcherHotkeyCode) ToggleSwitcherHotkey();
         else if (MacroWithHotkey(code) is KeyMacro macro) ToggleMacroHotkey(macro);
     }
 
@@ -901,7 +950,8 @@ public partial class MainWindow : Window
         ("clicker + shake", _settings.ComboCode, _settings.ComboName),
         ("building", _settings.BuildCode, _settings.BuildName),
         ("record", _settings.RecordCode, _settings.RecordName),
-        ("save replay", _settings.ReplayCode, _settings.ReplayName)
+        ("save replay", _settings.ReplayCode, _settings.ReplayName),
+        ("switcher", _settings.SwitcherHotkeyCode, _settings.SwitcherHotkeyName)
     };
 
     /// <summary>
@@ -926,18 +976,27 @@ public partial class MainWindow : Window
             ? new[]
             {
                 _settings.HotkeyCode, _settings.ComboCode, _settings.BuildCode,
-                _settings.RecordCode, _settings.ReplayCode
+                _settings.RecordCode, _settings.ReplayCode, _settings.SwitcherHotkeyCode
             }.Concat(MacroHotkeyCodes())
             : Array.Empty<int>());
 
         // Nothing may keep running once the only switch that could stop it is
         // greyed out. The macro cards disable their own toggle for the same
         // reason — see RefreshMacroCards.
-        if (!on) _macros.StopAll();
+        if (!on)
+        {
+            _macros.StopAll();
+
+            // Through the checkbox rather than the runner alone, same as
+            // StopClicker — otherwise the switcher's own page would still
+            // read "on" for a macro that just stopped.
+            SwitcherEnabled.IsChecked = false;
+        }
 
         RefreshHotkeySummary();
         RefreshStatus();
         RefreshMacroCards();
+        RefreshSwitcherCard();
 
         if (_loading) return;
 
@@ -981,9 +1040,7 @@ public partial class MainWindow : Window
     {
         if (_clicker.IsRunning)
         {
-            _building = false;
-            _clicker.Stop();
-            FlushHistory();
+            StopClicker();
         }
         else
         {
@@ -1045,6 +1102,8 @@ public partial class MainWindow : Window
         HotkeyButton.Content = _settings.HotkeyName;
         ComboHotkeyButton.Content = _settings.ComboName;
         BuildHotkeyButton.Content = _settings.BuildName;
+
+        ApplySwitcherSettings();
 
         ArmHotkeys();
 
