@@ -18,6 +18,13 @@ public sealed class AppSettings
     public bool HitFix { get; set; } = true;
     public bool UltraAccuracy { get; set; }
 
+    /// <summary>Which button the clicker presses. Stored by name, not number.</summary>
+    /// <remarks>
+    /// A name so a settings file stays readable and a reordered enum cannot
+    /// silently change what someone's saved configuration does.
+    /// </remarks>
+    public string ClickButton { get; set; } = "Left";
+
     /// <summary>Hold the key to click, rather than pressing once to latch.</summary>
     public bool HoldMode { get; set; }
 
@@ -61,6 +68,16 @@ public sealed class AppSettings
     /// <summary>Dark mode. The palette swaps; the accent does not.</summary>
     public bool Dark { get; set; } = true;
 
+    /// <summary>Bare file name of the stored wallpaper, or empty for none.</summary>
+    /// <remarks>
+    /// A name rather than a path: the file is copied into the settings folder,
+    /// so where it came from stops mattering the moment it is chosen.
+    /// </remarks>
+    public string WallpaperName { get; set; } = "";
+
+    /// <summary>How far the wallpaper is darkened, as a percentage.</summary>
+    public int WallpaperDimming { get; set; } = Wallpaper.DefaultDimming;
+
     public double Opacity { get; set; } = 1.0;
 
     /// <summary>Where clips go, or empty for the platform default.</summary>
@@ -85,7 +102,14 @@ public sealed class AppSettings
     {
         try
         {
-            if (!System.IO.File.Exists(File)) return new AppSettings();
+            if (!System.IO.File.Exists(File))
+            {
+                // A missing settings file is the one reliable signal for a
+                // brand new install. Someone who has settings and no wallpaper
+                // cleared it on purpose, and reinstalling it under them would
+                // read as the app deciding for itself.
+                return new AppSettings { WallpaperName = Wallpaper.InstallDefault() };
+            }
 
             return JsonSerializer.Deserialize<AppSettings>(System.IO.File.ReadAllText(File))
                    ?? new AppSettings();

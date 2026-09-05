@@ -16,6 +16,8 @@
   <ItemGroup>
     <Compile Include="../Core/ClickTiming.cs" />
     <Compile Include="../Core/ClickTiming.Tests.cs" />
+    <Compile Include="../Core/ClickOutput.cs" />
+    <Compile Include="../Core/ClickOutput.Tests.cs" />
     <Compile Include="../Core/Presets.cs" />
     <Compile Include="../Core/Presets.Tests.cs" />
     <Compile Include="../Core/ClickHistory.cs" />
@@ -31,9 +33,18 @@
     <Compile Include="../Core/SystemLoad.Tests.cs" />
     <Compile Include="../Capture/CaptureBackend.cs" />
     <Compile Include="../Capture/CaptureBackend.Tests.cs" />
+    <Compile Include="../Core/RemoteConfig.cs" />
+    <Compile Include="../Core/RemoteConfig.Tests.cs" />
+    <Compile Include="../Core/ClickButton.cs" />
+    <Compile Include="../Core/ClickButton.Tests.cs" />
+    <Compile Include="../Core/Wallpaper.cs" />
+    <Compile Include="../Core/Wallpaper.Tests.cs" />
     <!-- Pulled in as dependencies of the above, not tested directly. -->
     <Compile Include="../Core/SettingsPath.cs" />
     <Compile Include="../Capture/Ffmpeg.cs" />
+    <Compile Include="../Core/Clicker.cs" />
+    <Compile Include="../Core/Clicker.Tests.cs" />
+    <Compile Include="../Engine/IClickEngine.cs" />
   </ItemGroup>
 
   <ItemGroup>

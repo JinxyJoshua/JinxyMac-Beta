@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using JinxyMac.Core;
 
 namespace JinxyMac.Engine;
 
@@ -39,9 +40,24 @@ public sealed class MacClickEngine : IClickEngine
         }
     }
 
-    public void MouseDown() => Post(EventLeftMouseDown, pressure: 1.0);
+    public void MouseDown(ClickButton button) => Post(button, down: true, pressure: 1.0);
 
-    public void MouseUp() => Post(EventLeftMouseUp, pressure: 0.0);
+    public void MouseUp(ClickButton button) => Post(button, down: false, pressure: 0.0);
+
+    /// <summary>
+    /// The Quartz event type and button number for each button.
+    /// </summary>
+    /// <remarks>
+    /// Left and right have their own event types; everything else is "other"
+    /// and carries its number in the event. Kept as one table so the down and
+    /// the up cannot come from different places.
+    /// </remarks>
+    private static (uint Down, uint Up, uint Number) Codes(ClickButton button) => button switch
+    {
+        ClickButton.Right => (EventRightMouseDown, EventRightMouseUp, MouseButtonRight),
+        ClickButton.Middle => (EventOtherMouseDown, EventOtherMouseUp, MouseButtonCenter),
+        _ => (EventLeftMouseDown, EventLeftMouseUp, MouseButtonLeft)
+    };
 
     /// <summary>
     /// The event source every event is posted from, built once.
@@ -127,13 +143,15 @@ public sealed class MacClickEngine : IClickEngine
     /// Pressure goes with it. A real button reports full pressure while held
     /// and none once released, and the pair is what a strict reader checks.
     /// </remarks>
-    private static void Post(uint type, double pressure)
+    private static void Post(ClickButton button, bool down, double pressure)
     {
+        (uint downType, uint upType, uint number) = Codes(button);
+
         IntPtr click = IntPtr.Zero;
 
         try
         {
-            click = CGEventCreateMouseEvent(Source, type, Location(), MouseButtonLeft);
+            click = CGEventCreateMouseEvent(Source, down ? downType : upType, Location(), number);
             if (click == IntPtr.Zero) return;
 
             CGEventSetIntegerValueField(click, EventFieldClickState, 1);
@@ -143,7 +161,7 @@ public sealed class MacClickEngine : IClickEngine
         }
         catch
         {
-            // Same reasoning as MoveBy: never bring the loop down.
+            // Never bring the loop down.
         }
         finally
         {
@@ -192,7 +210,13 @@ public sealed class MacClickEngine : IClickEngine
     private const uint EventMouseMoved = 5;
     private const uint EventLeftMouseDown = 1;
     private const uint EventLeftMouseUp = 2;
+    private const uint EventRightMouseDown = 3;
+    private const uint EventRightMouseUp = 4;
+    private const uint EventOtherMouseDown = 25;
+    private const uint EventOtherMouseUp = 26;
     private const uint MouseButtonLeft = 0;
+    private const uint MouseButtonRight = 1;
+    private const uint MouseButtonCenter = 2;
     private const uint HidEventTap = 0;
 
     private const int EventFieldClickState = 1;

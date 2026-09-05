@@ -126,6 +126,11 @@ public partial class MainWindow : Window
         _ = StartCapture();
         RefreshMenuBar();
 
+        // Config first, so anything it turns off is off before the update
+        // prompt or any feature has had a chance to run. Fire and forget: the
+        // shipped defaults are already in force, and nothing waits on this.
+        _ = LoadRemoteConfig();
+
         // Quietly, and only if asked for. Nothing is downloaded without a press.
         if (_settings.AutoCheckUpdates) _ = CheckForUpdate(announce: false);
 
@@ -215,6 +220,16 @@ public partial class MainWindow : Window
         HitFixToggle.IsCheckedChanged += (_, _) => Publish();
         SpinToggle.IsCheckedChanged += (_, _) => Publish();
 
+        // Content set from the one place that names these, so "Wheel" is not
+        // spelled here as well as in ClickButtons.Label.
+        ButtonLeft.Content = ClickButtons.Label(ClickButton.Left);
+        ButtonRight.Content = ClickButtons.Label(ClickButton.Right);
+        ButtonMiddle.Content = ClickButtons.Label(ClickButton.Middle);
+
+        ButtonLeft.IsCheckedChanged += (_, _) => Publish();
+        ButtonRight.IsCheckedChanged += (_, _) => Publish();
+        ButtonMiddle.IsCheckedChanged += (_, _) => Publish();
+
         StartStopButton.Click += (_, _) => Toggle();
 
         HoldModeButton.IsCheckedChanged += (_, _) => ModeChanged();
@@ -254,6 +269,38 @@ public partial class MainWindow : Window
 
         PermissionReasonText.Text = _engine.Unavailable
             ?? "Clicks are not reaching the system.";
+    }
+
+    /// <summary>
+    /// Fetches the remote config, then re-renders whatever it changed.
+    /// </summary>
+    /// <remarks>
+    /// Split from <see cref="RemoteConfig.LoadAsync"/> itself only so this
+    /// window can repaint once the fetch lands — the config is fire-and-forget
+    /// and nothing else waits on it.
+    /// </remarks>
+    private async Task LoadRemoteConfig()
+    {
+        await RemoteConfig.LoadAsync(CancellationToken.None);
+
+        RefreshNotice();
+    }
+
+    /// <summary>
+    /// Shows the remote notice line, or nothing at all.
+    /// </summary>
+    /// <remarks>
+    /// Displayed only. It is never parsed, never treated as a link or a path
+    /// — <see cref="RemoteConfig"/> already caps its length, and the rest of
+    /// the safety here is simply that this is the only thing ever done with
+    /// it: assigned to a TextBlock's Text.
+    /// </remarks>
+    private void RefreshNotice()
+    {
+        string notice = RemoteConfig.Current.Notice;
+
+        NoticeText.Text = notice;
+        NoticeText.IsVisible = notice.Length > 0;
     }
 
     /// <summary>
@@ -446,8 +493,10 @@ public partial class MainWindow : Window
         // with them — a floor on the press length is exactly the thing the fixed
         // rate is choosing for itself.
         _clicker.Apply(_building
-            ? new ClickSettings(Clicker.BuildCps, Clicker.BuildDuty, false, SpinToggle.IsChecked == true)
-            : new ClickSettings(cps, duty, hitFix, SpinToggle.IsChecked == true));
+            ? new ClickSettings(Clicker.BuildCps, Clicker.BuildDuty, false,
+                                SpinToggle.IsChecked == true, SelectedButton)
+            : new ClickSettings(cps, duty, hitFix,
+                                SpinToggle.IsChecked == true, SelectedButton));
 
         if (_building)
         {
@@ -477,6 +526,12 @@ public partial class MainWindow : Window
         if (!_loading) Persist();
     }
 
+    /// <summary>The button the selector is on.</summary>
+    private ClickButton SelectedButton =>
+        ButtonRight.IsChecked == true ? ClickButton.Right
+        : ButtonMiddle.IsChecked == true ? ClickButton.Middle
+        : ClickButton.Left;
+
     private void UpdateMeasured()
     {
         long clicks = _clicker.ClickCount;
@@ -491,6 +546,24 @@ public partial class MainWindow : Window
             MeasuredText.Text = _clicker.IsRunning
                 ? $"Measured {rate:0.0} /s"
                 : "Measured — /s";
+
+            // Classified from the same one-second delta the readout shows, so
+            // the sentence and the number can never disagree.
+            double setCps = _building ? Clicker.BuildCps : CpsSlider.Value;
+            double duty = Math.Clamp(DutySlider.Value / 100.0, 0, 1);
+
+            OutputState state = ClickOutput.Classify(
+                _clicker.IsRunning,
+                setCps,
+                rate,
+                hitFixClamping: !_building
+                                && ClickTimings.IsClamped(setCps, duty, HitFixToggle.IsChecked == true));
+
+            VerdictText.Text = ClickOutput.Verdict(state, setCps, rate);
+
+            VerdictText.Foreground = ClickOutput.IsWarning(state)
+                ? this.FindResource("Accent") as IBrush
+                : this.FindResource("TextMuted") as IBrush;
 
             RecordActivity(seconds, delivered);
         }
@@ -883,6 +956,12 @@ public partial class MainWindow : Window
         HitFixToggle.IsChecked = _settings.HitFix;
         SpinToggle.IsChecked = _settings.UltraAccuracy;
 
+        ClickButton restored = ClickButtons.Parse(_settings.ClickButton);
+
+        ButtonLeft.IsChecked = restored == ClickButton.Left;
+        ButtonRight.IsChecked = restored == ClickButton.Right;
+        ButtonMiddle.IsChecked = restored == ClickButton.Middle;
+
         ShakeLeftSlider.Value = _settings.ShakeLeft;
         ShakeRightSlider.Value = _settings.ShakeRight;
         ShakeUpSlider.Value = _settings.ShakeUp;
@@ -934,6 +1013,8 @@ public partial class MainWindow : Window
         OpacitySlider.Value = Math.Clamp(_settings.Opacity, OpacitySlider.Minimum, OpacitySlider.Maximum);
         SetOpacity(OpacitySlider.Value);
 
+        WallpaperDimmingSlider.Value = _settings.WallpaperDimming;
+
         try
         {
             SetAccent(Color.Parse(_settings.AccentColor));
@@ -947,6 +1028,8 @@ public partial class MainWindow : Window
         RefreshReadouts();
 
         _loading = false;
+
+        ApplyWallpaper();
     }
 
     private void Persist()
@@ -957,6 +1040,7 @@ public partial class MainWindow : Window
         _settings.Cdc = DutySlider.Value;
         _settings.HitFix = HitFixToggle.IsChecked == true;
         _settings.UltraAccuracy = SpinToggle.IsChecked == true;
+        _settings.ClickButton = SelectedButton.ToString();
 
         _settings.Shake = ShakeToggle.IsChecked == true;
         _settings.ShakeLeft = ShakeLeftSlider.Value;
@@ -1589,11 +1673,31 @@ public partial class MainWindow : Window
         RecordError.IsVisible = true;
     }
 
+    /// <summary>
+    /// Shown wherever a start is refused because <see cref="RemoteConfig"/>
+    /// switched the recorder off. Said plainly rather than as a generic
+    /// "unavailable" — this is a deliberate remote kill, not a local fault,
+    /// and the wording should not send anyone hunting for one.
+    /// </summary>
+    private const string RecorderDisabledMessage =
+        "Recording has been switched off remotely because it was found broken. "
+        + "It will come back once that is fixed — no update needed.";
+
     private async Task ToggleRecording()
     {
         RecordError.IsVisible = false;
 
-        if (!_recorder.IsRecording) WarnIfCaptureBlocked();
+        if (!_recorder.IsRecording)
+        {
+            if (!RemoteConfig.Current.RecorderEnabled)
+            {
+                RecordError.Text = RecorderDisabledMessage;
+                RecordError.IsVisible = true;
+                return;
+            }
+
+            WarnIfCaptureBlocked();
+        }
 
         RecordButton.IsEnabled = false;
 
@@ -1679,6 +1783,20 @@ public partial class MainWindow : Window
     private void RefreshReplay()
     {
         bool wanted = ReplayEnabled.IsChecked == true;
+
+        // The remote kill switch covers the buffer too — it re-encodes the
+        // screen for the whole session, which is exactly the kind of thing a
+        // broken ffmpeg or Screen Recording setup turns into a crash loop.
+        if (wanted && !_replay.IsRunning && !RemoteConfig.Current.RecorderEnabled)
+        {
+            ReplayStatusText.Text = RecorderDisabledMessage;
+
+            _loading = true;
+            ReplayEnabled.IsChecked = false;
+            _loading = false;
+
+            return;
+        }
 
         // Same permission, same silent failure — a buffer full of black frames
         // is worse than one that never started, because it looks like it works
@@ -2005,6 +2123,106 @@ public partial class MainWindow : Window
             UseCustomAccent();
             e.Handled = true;
         };
+
+        ChooseWallpaperButton.Click += async (_, _) => await ChooseWallpaperAsync();
+
+        ClearWallpaperButton.Click += (_, _) =>
+        {
+            Wallpaper.Clear();
+            _settings.WallpaperName = "";
+            ApplyWallpaper();
+            Persist();
+        };
+
+        WallpaperDimmingSlider.PropertyChanged += (_, e) =>
+        {
+            if (e.Property != RangeBase.ValueProperty) return;
+
+            _settings.WallpaperDimming = Wallpaper.ClampDimming((int)WallpaperDimmingSlider.Value);
+            ApplyWallpaper();
+
+            if (!_loading) Persist();
+        };
+    }
+
+    /// <summary>
+    /// What the file picker offers, built from the same list the store accepts.
+    /// </summary>
+    /// <remarks>
+    /// Lives here rather than beside <see cref="Wallpaper.Allowed"/> because
+    /// Core carries no Avalonia dependency — the test project compiles those
+    /// files without it. Derived from that array so a format cannot be added to
+    /// one and missed in the other.
+    /// </remarks>
+    private static FilePickerFileType ImageFileType => new("Images")
+    {
+        Patterns = Wallpaper.Allowed.Select(e => "*" + e).ToArray()
+    };
+
+    private async Task ChooseWallpaperAsync()
+    {
+        try
+        {
+            IReadOnlyList<IStorageFile> picked = await StorageProvider.OpenFilePickerAsync(
+                new FilePickerOpenOptions
+                {
+                    Title = "Choose a background",
+                    AllowMultiple = false,
+                    FileTypeFilter = new[] { ImageFileType }
+                });
+
+            string? path = picked.Count > 0 ? picked[0].TryGetLocalPath() : null;
+            if (path == null) return;
+
+            string? stored = Wallpaper.Store(path);
+            if (stored == null)
+            {
+                WallpaperStatusText.Text = "That file could not be read. Try a PNG or JPEG.";
+                return;
+            }
+
+            _settings.WallpaperName = stored;
+            ApplyWallpaper();
+            Persist();
+        }
+        catch
+        {
+            // A cancelled or failed pick leaves the previous background alone.
+        }
+    }
+
+    /// <summary>Paints the stored wallpaper, or nothing when there is not one.</summary>
+    private void ApplyWallpaper()
+    {
+        string? path = Wallpaper.Resolve(_settings.WallpaperName);
+
+        WallpaperImage.Source = null;
+
+        // Both layers move together. A dim border left visible with no picture
+        // behind it would tint the whole window for no reason.
+        if (path == null)
+        {
+            WallpaperStatusText.Text = "No picture set.";
+            WallpaperImage.IsVisible = false;
+            WallpaperDim.IsVisible = false;
+            return;
+        }
+
+        try
+        {
+            WallpaperImage.Source = new Bitmap(path);
+            WallpaperImage.IsVisible = true;
+            WallpaperDim.IsVisible = true;
+            WallpaperDim.Opacity = Wallpaper.DimmingOpacity(_settings.WallpaperDimming);
+            WallpaperStatusText.Text = $"Using {_settings.WallpaperName}.";
+        }
+        catch
+        {
+            // A file that will not decode is the same as not having one.
+            WallpaperImage.IsVisible = false;
+            WallpaperDim.IsVisible = false;
+            WallpaperStatusText.Text = "That picture could not be decoded, so it is not being shown.";
+        }
     }
 
     private void BuildSwatches()

@@ -1,3 +1,5 @@
+using JinxyMac.Core;
+
 namespace JinxyMac.Engine;
 
 /// <summary>
@@ -26,8 +28,17 @@ public interface IClickEngine
     /// </remarks>
     string? Unavailable { get; }
 
-    void MouseDown();
-    void MouseUp();
+    /// <summary>
+    /// Presses a button. The caller is responsible for releasing the same one.
+    /// </summary>
+    /// <remarks>
+    /// The button is a parameter rather than engine state so a press and its
+    /// release cannot disagree: there is nothing for a selector change to
+    /// mutate between them.
+    /// </remarks>
+    void MouseDown(ClickButton button);
+
+    void MouseUp(ClickButton button);
 
     /// <summary>Moves the pointer by a delta, for shake.</summary>
     void MoveBy(int dx, int dy);

@@ -206,6 +206,16 @@
 
     <Grid ColumnDefinitions="196,*">
 
+        <!--
+          Behind every other child, and across both columns. Without the span
+          these would sit in column 0 and tint only the sidebar.
+        -->
+        <Image Name="WallpaperImage" Grid.Column="0" Grid.ColumnSpan="2"
+               Stretch="UniformToFill" IsVisible="False"/>
+        <Border Name="WallpaperDim" Grid.Column="0" Grid.ColumnSpan="2"
+                Background="{DynamicResource Backdrop}"
+                Opacity="0.45" IsVisible="False"/>
+
         <!-- Sidebar -->
         <Border Grid.Column="0" Background="{DynamicResource Rail}">
             <DockPanel>
@@ -275,6 +285,14 @@
 
                     <!-- Clicker -->
                     <StackPanel Name="PageClicker">
+
+                        <!-- A short remote line, e.g. "known issue, fix coming".
+                             Empty means nothing shown — not an empty gap.
+                             Displayed only: never parsed, never a link, never
+                             a path. -->
+                        <TextBlock Name="NoticeText" Classes="hint" IsVisible="False"
+                                   Foreground="{DynamicResource Accent}" TextWrapping="Wrap"
+                                   Margin="0,0,0,14"/>
 
                         <!-- Shown when macOS is refusing to deliver the clicks.
                              This is the failure that looks like a broken app:
@@ -402,7 +420,10 @@
                                             Margin="0,10,0,0"/>
                                     <!-- Clicks actually delivered, not clicks requested. -->
                                     <TextBlock Name="MeasuredText" Text="Measured — /s"
-                                               Classes="hint" Margin="0,8,0,0"/>
+                                               Classes="hint"/>
+                                    <TextBlock Name="VerdictText" TextWrapping="Wrap"
+                                               Classes="hint" Margin="0,6,0,0"
+                                               Text="Start clicking to measure what the game actually receives."/>
                                     <!-- Only shown while something is overriding the sliders. -->
                                     <TextBlock Name="ClampText" IsVisible="False"
                                                Foreground="{DynamicResource Accent}"
@@ -411,20 +432,32 @@
                             </Border>
 
                             <Border Grid.Row="1" Grid.Column="0" Classes="card">
-                                <DockPanel LastChildFill="False">
-                                    <StackPanel VerticalAlignment="Center">
-                                        <TextBlock Text="MODE" Classes="label"/>
-                                        <TextBlock Text="Hold the key, or press to latch" Classes="hint"/>
+                                <StackPanel>
+                                    <DockPanel LastChildFill="False">
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="MODE" Classes="label"/>
+                                            <TextBlock Text="Hold the key, or press to latch" Classes="hint"/>
+                                        </StackPanel>
+                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
+                                                    VerticalAlignment="Center">
+                                            <RadioButton Name="HoldModeButton" GroupName="ClickMode"
+                                                         Classes="segment" Content="Hold"/>
+                                            <RadioButton Name="ToggleModeButton" GroupName="ClickMode"
+                                                         Classes="segment" Content="Toggle"
+                                                         IsChecked="True" Margin="0"/>
+                                        </StackPanel>
+                                    </DockPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,14,0,0" Spacing="8">
+                                        <TextBlock Text="BUTTON" VerticalAlignment="Center"
+                                                   FontWeight="Bold" Margin="0,0,8,0"/>
+                                        <RadioButton Name="ButtonLeft" GroupName="ClickButton"
+                                                     Content="Left" IsChecked="True"/>
+                                        <RadioButton Name="ButtonRight" GroupName="ClickButton"
+                                                     Content="Right"/>
+                                        <RadioButton Name="ButtonMiddle" GroupName="ClickButton"
+                                                     Content="Wheel"/>
                                     </StackPanel>
-                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
-                                                VerticalAlignment="Center">
-                                        <RadioButton Name="HoldModeButton" GroupName="ClickMode"
-                                                     Classes="segment" Content="Hold"/>
-                                        <RadioButton Name="ToggleModeButton" GroupName="ClickMode"
-                                                     Classes="segment" Content="Toggle"
-                                                     IsChecked="True" Margin="0"/>
-                                    </StackPanel>
-                                </DockPanel>
+                                </StackPanel>
                             </Border>
 
                             <Border Grid.Row="1" Grid.Column="2" Classes="card">
@@ -946,6 +979,26 @@
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Text="BACKGROUND" FontWeight="Bold"/>
+                                <TextBlock Classes="hint" Margin="0,4,0,0"
+                                           Text="A picture behind the window. It is copied here, so moving or deleting the original changes nothing."/>
+
+                                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,12,0,0">
+                                    <Button Name="ChooseWallpaperButton" Content="Choose a picture"/>
+                                    <Button Name="ClearWallpaperButton" Content="Remove"/>
+                                </StackPanel>
+
+                                <TextBlock Name="WallpaperStatusText" Classes="hint" Margin="0,10,0,0"
+                                           Text="No picture set."/>
+
+                                <TextBlock Text="DIMMING" FontWeight="Bold" Margin="0,16,0,0"/>
+                                <Slider Name="WallpaperDimmingSlider" Minimum="0" Maximum="90"
+                                        Value="45" Margin="0,6,0,0"/>
                             </StackPanel>
                         </Border>
                     </StackPanel>
