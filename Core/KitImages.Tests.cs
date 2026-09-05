@@ -60,7 +60,7 @@ public class KitImagesTests
     [InlineData("art.png")]
     [InlineData("art.JPG")]
     [InlineData("art.webp")]
-    public void AcceptsThePicturesWpfCanDecode(string path)
+    public void AcceptsThePicturesSkiaCanDecode(string path)
     {
         Assert.True(KitImages.IsSupported(path));
     }

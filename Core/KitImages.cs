@@ -21,7 +21,7 @@ namespace JinxyMac.Core;
 /// </remarks>
 public static class KitImages
 {
-    /// <summary>Formats WPF decodes without an extra codec.</summary>
+    /// <summary>Formats Avalonia's Skia decoder reads without an extra codec.</summary>
     private static readonly string[] Allowed = { ".png", ".jpg", ".jpeg", ".webp", ".bmp" };
 
     public static string FileFilter =>
