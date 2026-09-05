@@ -161,6 +161,7 @@ public partial class MainWindow : Window
         WireKitWheel();
         WireMacros();
         WireSwitcher();
+        WireMacroBadge();
         WireTheme();
         WireSettings();
         WireCache();
@@ -213,6 +214,13 @@ public partial class MainWindow : Window
             _clicker.Dispose();
             _shaker.Dispose();
             _hotkeys.Dispose();
+
+            // Closed explicitly rather than left to fall with the process:
+            // ShutdownMode is OnMainWindowClose, so it would go regardless,
+            // but that leaves a topmost, undecorated window flash closed
+            // rather than disappearing with the rest of the app.
+            _macroBadgeTicker.Stop();
+            _macroBadge?.Close();
         };
 
         _hotkeys.Start();

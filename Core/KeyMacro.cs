@@ -214,6 +214,35 @@ public sealed class MacroRunner : IDisposable
     /// </remarks>
     public IEnumerable<int> RunningKeys() => _running.Values.SelectMany(e => e.Macro.Keys);
 
+    /// <summary>
+    /// What the on-screen badge should say for each currently running macro.
+    /// </summary>
+    /// <remarks>
+    /// The keys, not an ordinary macro's own name — a badge that answers "why
+    /// is my F doing that" needs the thing being sent, not whatever its
+    /// author happened to call it, so this reads straight off each running
+    /// <see cref="KeyMacro"/>'s own <see cref="KeyMacro.KeysText"/>.
+    ///
+    /// The auto switcher (<see cref="SwitcherMacro.Name"/>) is the one
+    /// exception: it has no card of its own for two bare numbers to sit
+    /// beside, so its line names it explicitly rather than reading as an
+    /// anonymous macro nobody remembers creating.
+    ///
+    /// Read straight off <c>_running</c> rather than built from a
+    /// caller-supplied macro list, which is what makes this correct for the
+    /// switcher: its <see cref="KeyMacro"/> is rebuilt fresh by
+    /// <see cref="SwitcherMacro.Build"/> every time it starts (see that
+    /// type's remarks) and is never one of the macros kept in
+    /// <c>MacroStore</c>'s saved list, so nothing outside this runner has a
+    /// current copy to read <see cref="KeyMacro.KeysText"/> from.
+    /// </remarks>
+    public IReadOnlyList<string> BadgeLines() =>
+        _running.Values
+            .Select(e => (e.Macro.Name, Keys: e.Macro.KeysText.Trim()))
+            .Where(e => e.Keys.Length > 0)
+            .Select(e => e.Name == SwitcherMacro.Name ? $"Auto Switcher: {e.Keys}" : e.Keys)
+            .ToList();
+
     /// <summary>How many key presses have actually gone out.</summary>
     /// <remarks>
     /// Counts sends, not ticks. A macro that is running but suppressed reads

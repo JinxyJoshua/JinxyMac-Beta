@@ -293,6 +293,80 @@ public class MacroRunnerTests
     }
 
     /// <summary>
+    /// The line the on-screen badge shows for an ordinary running macro: its
+    /// keys, not the name it was saved under.
+    /// </summary>
+    [Fact]
+    public void BadgeLinesShowsAnOrdinaryMacrosKeysNotItsName()
+    {
+        var engine = new FakeKeyEngine();
+        using var runner = new MacroRunner(engine);
+
+        var macro = new KeyMacro("Sword Spam", new[] { 0x52 }, "R", 25);
+        runner.Start(macro);
+
+        Assert.Equal(new[] { "R" }, runner.BadgeLines());
+
+        runner.Stop("Sword Spam");
+    }
+
+    /// <summary>
+    /// The auto switcher runs under <see cref="SwitcherMacro.Name"/> — a
+    /// reserved, leading-space internal name nobody should ever see on
+    /// screen. <see cref="MacroRunner.BadgeLines"/> must label it rather than
+    /// leak that name or show its keys with no label at all.
+    /// </summary>
+    [Fact]
+    public void BadgeLinesLabelsTheAutoSwitcherRatherThanItsInternalName()
+    {
+        var engine = new FakeKeyEngine();
+        using var runner = new MacroRunner(engine);
+
+        var switcher = new KeyMacro(SwitcherMacro.Name, new[] { 0x31, 0x32 }, "1, 2", 25);
+        runner.Start(switcher);
+
+        string line = Assert.Single(runner.BadgeLines());
+        Assert.DoesNotContain(SwitcherMacro.Name, line);
+        Assert.Contains("1, 2", line);
+
+        runner.Stop(SwitcherMacro.Name);
+    }
+
+    [Fact]
+    public void BadgeLinesOmitsAStoppedMacro()
+    {
+        var engine = new FakeKeyEngine();
+        using var runner = new MacroRunner(engine);
+
+        var macro = new KeyMacro("Macro", new[] { 0x52 }, "R", 25);
+        runner.Start(macro);
+        Assert.NotEmpty(runner.BadgeLines());
+
+        runner.Stop("Macro");
+
+        Assert.Empty(runner.BadgeLines());
+    }
+
+    [Fact]
+    public void BadgeLinesListsEveryRunningMacro()
+    {
+        var engine = new FakeKeyEngine();
+        using var runner = new MacroRunner(engine);
+
+        var first = new KeyMacro("First", new[] { 0x31 }, "1", 25);
+        var second = new KeyMacro("Second", new[] { 0x32 }, "2", 25);
+
+        runner.Start(first);
+        runner.Start(second);
+
+        Assert.Equal(2, runner.BadgeLines().Count);
+        Assert.Contains("1", runner.BadgeLines());
+        Assert.Contains("2", runner.BadgeLines());
+
+        runner.StopAll();
+    }
+
+    /// <summary>
     /// <see cref="MacroRunner.Suppressed"/> is what stops a macro typing into
     /// this app's own window (<c>MainWindow</c> wires it to a cached
     /// <c>IsActive</c>). This is the guarantee that matters: nothing sent
