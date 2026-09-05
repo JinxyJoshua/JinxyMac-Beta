@@ -121,4 +121,76 @@ public class ClickerTests
 
         Assert.Null(held);
     }
+
+    /// <summary>
+    /// Covers the `finally` rescue path in Loop: when the loop exits while a
+    /// press is still open, the release it sends there must name the button
+    /// that was actually pressed, not whatever is selected at that moment. A
+    /// rescue that re-read current settings instead of the recorded press
+    /// would leave a button held down across the entire desktop.
+    /// </summary>
+    [Fact]
+    public void StoppingMidPress_RescuePathReleasesWhatWasPressed()
+    {
+        var engine = new FakeClickEngine();
+        using var clicker = new Clicker(engine);
+
+        // 8 CPS / 90% duty resolves, via HitFix, to roughly a 112ms press and
+        // a 15ms gap -- long enough that a press is reliably still open well
+        // after it starts.
+        clicker.Apply(new ClickSettings(8, 0.9, true, false, ClickButton.Right));
+        clicker.Start();
+
+        // Wait until the first press is definitely open, rather than assuming
+        // a fixed delay covers thread start-up.
+        for (int i = 0; i < 500 && engine.Events.Count == 0; i++)
+            Thread.Sleep(2);
+
+        var opened = engine.Events;
+        Assert.NotEmpty(opened);
+        Assert.True(opened[0].Down);
+        Assert.Equal(ClickButton.Right, opened[0].Button);
+
+        // Give the press a moment to be solidly open -- comfortably inside
+        // its ~112ms length, with generous margin either side.
+        Thread.Sleep(30);
+
+        // Switch the selection to a different button without waiting for the
+        // open Right press to close, then stop immediately. This forces the
+        // loop out through the `finally` rescue path while Right is still
+        // held, with Middle now selected.
+        clicker.Apply(new ClickSettings(8, 0.9, true, false, ClickButton.Middle));
+        clicker.Stop();
+        Thread.Sleep(300);
+
+        var events = engine.Events;
+        Assert.NotEmpty(events);
+
+        // The last event in the log is the rescue release. It must name what
+        // was pressed, never what is selected now.
+        var last = events[^1];
+        Assert.False(last.Down);
+        Assert.Equal(ClickButton.Right, last.Button);
+        Assert.DoesNotContain(events, e => e.Button == ClickButton.Middle);
+
+        // And the whole log stays balanced: every down matched by an up of
+        // the same button before the next down.
+        ClickButton? held = null;
+
+        foreach ((ClickButton button, bool down) in events)
+        {
+            if (down)
+            {
+                Assert.Null(held);
+                held = button;
+            }
+            else
+            {
+                Assert.Equal(held, button);
+                held = null;
+            }
+        }
+
+        Assert.Null(held);
+    }
 }
