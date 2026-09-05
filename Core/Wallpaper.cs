@@ -65,24 +65,45 @@ public static class Wallpaper
     {
         if (!IsSupported(sourcePath) || !File.Exists(sourcePath)) return null;
 
+        string name = StoredNameFor(sourcePath);
+        string target = SettingsPath.For(name);
+
+        // Copying a file over itself throws. Re-picking the stored copy is
+        // a no-op, not a failure.
+        if (string.Equals(Path.GetFullPath(sourcePath), Path.GetFullPath(target),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return name;
+        }
+
+        string temp = target + ".tmp";
+
         try
         {
-            string name = StoredNameFor(sourcePath);
-            string target = SettingsPath.For(name);
+            // Copied to a temporary name first. Only once that succeeds is the
+            // old wallpaper cleared and the temp file swung into place — a
+            // copy that fails partway (a network share dropping mid-copy, say)
+            // must leave the previous background exactly as it was, not a
+            // settings folder with neither file in it.
+            File.Copy(sourcePath, temp, overwrite: true);
 
-            // Copying a file over itself throws. Re-picking the stored copy is
-            // a no-op, not a failure.
-            if (!string.Equals(Path.GetFullPath(sourcePath), Path.GetFullPath(target),
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                Clear();
-                File.Copy(sourcePath, target, overwrite: true);
-            }
+            Clear();
+            File.Move(temp, target, overwrite: true);
 
             return name;
         }
         catch
         {
+            try
+            {
+                if (File.Exists(temp)) File.Delete(temp);
+            }
+            catch
+            {
+                // Best effort. A stray temp file is harmless — it is
+                // overwritten the next time one is stored.
+            }
+
             return null;
         }
     }

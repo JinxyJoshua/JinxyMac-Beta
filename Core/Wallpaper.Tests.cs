@@ -54,6 +54,49 @@ public class WallpaperTests
         }
     }
 
+    /// <summary>
+    /// The spec's error handling promises that a failed copy leaves the
+    /// previous background in place. Clearing the old file before the new one
+    /// is safely on disk would break that the moment a copy failed partway —
+    /// e.g. a network share dropping between the existence check and the copy.
+    /// </summary>
+    [Fact]
+    public void AFailedCopyLeavesTheExistingWallpaperInPlace()
+    {
+        string oldSource = Path.Combine(Path.GetTempPath(), $"wp-test-old-{Guid.NewGuid():N}.png");
+        string newSource = Path.Combine(Path.GetTempPath(), $"wp-test-new-{Guid.NewGuid():N}.png");
+        File.WriteAllBytes(oldSource, new byte[] { 1, 2, 3 });
+        File.WriteAllBytes(newSource, new byte[] { 4, 5, 6 });
+
+        string target = SettingsPath.For(Wallpaper.StoredNameFor(newSource));
+        string temp = target + ".tmp";
+
+        try
+        {
+            // Store the first picture for real, so there is something in
+            // place worth protecting.
+            Assert.Equal("wallpaper.png", Wallpaper.Store(oldSource));
+            Assert.True(File.Exists(target));
+
+            // Block the copy by putting a directory where the temp file needs
+            // to land, so File.Copy throws partway through Store.
+            Directory.CreateDirectory(temp);
+
+            Assert.Null(Wallpaper.Store(newSource));
+
+            // The old wallpaper is exactly as it was — never cleared.
+            Assert.True(File.Exists(target));
+            Assert.Equal(new byte[] { 1, 2, 3 }, File.ReadAllBytes(target));
+        }
+        finally
+        {
+            if (Directory.Exists(temp)) Directory.Delete(temp, recursive: true);
+            Wallpaper.Clear();
+            File.Delete(oldSource);
+            File.Delete(newSource);
+        }
+    }
+
     [Fact]
     public void NothingStoredResolvesToNothing()
     {
