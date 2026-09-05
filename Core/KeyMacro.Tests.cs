@@ -232,7 +232,111 @@ public class KeyMacroTests
         });
     }
 
-    private static void WithMacrosFile(string json, Action assertion)
+    // ---- the write half ----
+    //
+    // Load() is covered above: a macos file loads, a windows file loads
+    // empty, a file with no platform member loads empty. Save() sets the
+    // platform field but nothing asserted it — a wrong or missing tag would
+    // produce a file that fails its own Load(), and every macro would
+    // silently vanish on the next launch with no error at all.
+
+    /// <summary>
+    /// Save() then Load() carries a fully-populated macro back unchanged,
+    /// <c>Enabled: false</c> included — a disabled macro must come back
+    /// disabled, or a macro someone switched off would switch itself back on
+    /// across a restart.
+    /// </summary>
+    /// <remarks>
+    /// The macro under test is built with <c>HoldsMs</c>, <c>ClicksWanted</c>
+    /// and <c>EquipMs</c> populated too, but nothing here asserts on them
+    /// surviving: <see cref="MacroStore"/>'s <c>StoredMacro</c> has no fields
+    /// for them at all (confirmed against the current source — this is not
+    /// a mutant-testing gap, it's pre-existing in the ported Windows source
+    /// too), so they are silently dropped by <c>Save()</c> today. That's a
+    /// real, separate bug from the platform-tag one this task is about, and
+    /// fixing it means changing <c>Core/KeyMacro.cs</c>, which is out of
+    /// scope here. Populating them anyway proves a macro that uses these
+    /// features doesn't crash the round trip; asserting on them would just
+    /// make this test fail for a reason unrelated to what it's checking.
+    /// </remarks>
+    [Fact]
+    public void SaveThenLoadRoundTripsAFullyPopulatedMacro()
+    {
+        WithMacrosFile(null, () =>
+        {
+            var macro = new KeyMacro(
+                "Crossbow Switch",
+                new[] { 0x31, 0x32 },
+                "1, 2",
+                intervalMs: 350,
+                holdsMs: new[] { 1200, 180 },
+                clicksWanted: 3,
+                equipMs: 90,
+                hotkey: new HotkeyBinding(42, "F13"),
+                enabled: false);
+
+            MacroStore.Save(new List<KeyMacro> { macro });
+
+            KeyMacro loaded = Assert.Single(MacroStore.Load());
+
+            Assert.Equal("Crossbow Switch", loaded.Name);
+            Assert.Equal(new[] { 0x31, 0x32 }, loaded.Keys);
+            Assert.Equal("1, 2", loaded.KeysText);
+            Assert.Equal(350, loaded.IntervalMs);
+            Assert.Equal(42, loaded.Hotkey.Code);
+            Assert.Equal("F13", loaded.Hotkey.Name);
+            Assert.False(loaded.Enabled);
+        });
+    }
+
+    /// <summary>
+    /// Asserted on the raw file text rather than on Load()'s behaviour — the
+    /// point is to catch the tag being wrong independently of the reader, so
+    /// a broken writer and a broken reader can't hide behind each other.
+    /// </summary>
+    [Fact]
+    public void SaveWritesThePlatformTag()
+    {
+        WithMacrosFile(null, () =>
+        {
+            MacroStore.Save(new List<KeyMacro> { new("R", new[] { 0x52 }, "R", 120) });
+
+            string raw = File.ReadAllText(MacrosFilePath);
+            using var doc = System.Text.Json.JsonDocument.Parse(raw);
+
+            Assert.Equal("macos", doc.RootElement.GetProperty("platform").GetString());
+        });
+    }
+
+    /// <summary>
+    /// Proves the writer and the reader agree on the same field name: a file
+    /// this build wrote, then tampered to claim a different platform, loads
+    /// exactly as empty as a file that platform actually wrote.
+    /// </summary>
+    [Fact]
+    public void SaveThenLoadEmptiesOutIfThePlatformTagIsTamperedWith()
+    {
+        WithMacrosFile(null, () =>
+        {
+            MacroStore.Save(new List<KeyMacro> { new("R", new[] { 0x52 }, "R", 120) });
+
+            string raw = File.ReadAllText(MacrosFilePath);
+            string tampered = raw.Replace("\"macos\"", "\"windows\"");
+            Assert.NotEqual(raw, tampered); // sanity: the replace actually matched
+            File.WriteAllText(MacrosFilePath, tampered);
+
+            Assert.Empty(MacroStore.Load());
+        });
+    }
+
+    /// <summary>
+    /// Backs up whatever is at the real macros file and restores it
+    /// afterwards, same as every other test in this section. A null
+    /// <paramref name="json"/> skips the initial write instead of writing
+    /// literally "null" — for the Save()-side tests below, which want the
+    /// real file left exactly as it was until Save() itself writes it.
+    /// </summary>
+    private static void WithMacrosFile(string? json, Action assertion)
     {
         string path = MacrosFilePath;
         bool existed = File.Exists(path);
@@ -240,7 +344,7 @@ public class KeyMacroTests
 
         try
         {
-            File.WriteAllText(path, json);
+            if (json != null) File.WriteAllText(path, json);
             assertion();
         }
         finally
