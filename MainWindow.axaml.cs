@@ -168,6 +168,14 @@ public partial class MainWindow : Window
             _kitArtCts.Cancel();
             _kitArtCts.Dispose();
 
+            // A roll in flight has the same problem: its own DispatcherTimer
+            // only stops itself from inside its own Tick, so closing mid-roll
+            // would otherwise leave it ticking and calling Settle against
+            // controls that no longer exist.
+            _kitRollTicker?.Stop();
+            _kitRollTicker = null;
+            _kitRolling = false;
+
             _recorder.Dispose();
             _replay.Dispose();
             _macros.Dispose();
@@ -223,12 +231,13 @@ public partial class MainWindow : Window
         // nobody is looking at is work for nothing.
         if (ReferenceEquals(page, PageHistory)) RefreshHistory();
 
-        // Opening the kit list on a first-ever visit, and pulling down any
-        // pictures this install has not got, both belong to arriving on the
-        // page rather than to launch — someone who never opens it never
-        // spends the bandwidth.
+        // Building the roster tiles, opening the kit list on a first-ever
+        // visit, and pulling down any pictures this install has not got, all
+        // belong to arriving on the page rather than to launch — someone who
+        // never opens it never pays for the decode or the bandwidth.
         if (ReferenceEquals(page, PageKitWheel))
         {
+            EnsureKitWheelBuilt();
             OpenKitListIfNothingPicked();
             _ = FetchMissingKitArtAsync();
         }

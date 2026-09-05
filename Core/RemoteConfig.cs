@@ -58,6 +58,15 @@ public sealed class RemoteConfig
     /// </remarks>
     public bool RecorderEnabled { get; init; } = true;
 
+    /// <summary>Whether the kit wheel may fetch missing kit pictures from the wiki.</summary>
+    /// <remarks>
+    /// A switch rather than a number, for the same reason <see cref="RecorderEnabled"/>
+    /// is one: the fetch reaches a site nobody here controls, and if it ever
+    /// starts saving something broken, turning it off beats waiting for
+    /// everyone to install a fix.
+    /// </remarks>
+    public bool KitArtFetchEnabled { get; init; } = true;
+
     /// <summary>
     /// A short line shown in the app, for saying "known issue, fix coming".
     /// </summary>
@@ -94,6 +103,7 @@ public sealed class RemoteConfig
                 HitFixMinDownMs = Clamped(root, "hitFixMinDownMs", fallback.HitFixMinDownMs, 1, 100),
                 HitFixMinUpMs = Clamped(root, "hitFixMinUpMs", fallback.HitFixMinUpMs, 1, 100),
                 RecorderEnabled = Flag(root, "recorderEnabled", fallback.RecorderEnabled),
+                KitArtFetchEnabled = Flag(root, "kitArtFetchEnabled", fallback.KitArtFetchEnabled),
                 Notice = Text(root, "notice")
             };
         }

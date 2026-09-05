@@ -67,7 +67,19 @@ public partial class MainWindow
     private readonly CancellationTokenSource _kitArtCts = new();
     private bool _kitArtStarted;
     private bool _kitListAutoOpened;
+    private bool _kitWheelBuilt;
     private string _kitSearch = "";
+
+    /// <summary>The reel's own timer, while a roll is in flight.</summary>
+    /// <remarks>
+    /// Kept so <c>Closed</c> can stop it if the window shuts mid-roll — the
+    /// same reasoning <see cref="_kitArtCts"/> already gets for the network
+    /// fetch, just missing here until now. Cleared the moment the reel stops,
+    /// whether that is the tick handler finishing normally or the window
+    /// closing early, so it is never stopped twice and never outlives the
+    /// roll it belongs to.
+    /// </remarks>
+    private DispatcherTimer? _kitRollTicker;
 
     /// <summary>Which of the two reel layers is currently in front.</summary>
     private bool _kitReelOnA = true;
@@ -132,6 +144,24 @@ public partial class MainWindow
             AddTypedKit();
             e.Handled = true;
         };
+    }
+
+    /// <summary>
+    /// Builds the roster tiles the first time the page is actually shown.
+    /// </summary>
+    /// <remarks>
+    /// A tile per kit means decoding and compositing a picture for the whole
+    /// roster — real work, on the UI thread. Run from the constructor that
+    /// would mean every launch pays it before the window is even visible, for
+    /// a page most sessions never open. Deferred to first arrival at the
+    /// page instead, the same way <see cref="FetchMissingKitArtAsync"/> and
+    /// <see cref="OpenKitListIfNothingPicked"/> already are — both gated on
+    /// arriving at <c>PageKitWheel</c> inside <c>Show</c>, not on launch.
+    /// </remarks>
+    private void EnsureKitWheelBuilt()
+    {
+        if (_kitWheelBuilt) return;
+        _kitWheelBuilt = true;
 
         RefreshKitWheel();
     }
@@ -150,6 +180,14 @@ public partial class MainWindow
     private async Task FetchMissingKitArtAsync()
     {
         if (_kitArtStarted) return;
+
+        // Switchable from the published config, for the case where the wiki
+        // changes shape and every fetch starts saving rubbish. Turning it off
+        // beats waiting for everyone to install a fix. Left unset rather than
+        // latched, so a config published later in the same session is picked
+        // up on the next visit to the page instead of needing a restart.
+        if (!RemoteConfig.Current.KitArtFetchEnabled) return;
+
         _kitArtStarted = true;
 
         await KitArtFetch.RunAsync(
@@ -158,6 +196,7 @@ public partial class MainWindow
             {
                 // Cached nulls from before the download have to go, or the
                 // tiles keep showing placeholders for pictures now on disk.
+                foreach (Bitmap? cached in _kitArtCache.Values) DisposeKitArt(cached);
                 _kitArtCache.Clear();
                 RefreshKitWheel();
 
@@ -395,7 +434,7 @@ public partial class MainWindow
             }
 
             // Only this kit's cached picture is stale.
-            _kitArtCache.Remove(kit);
+            if (_kitArtCache.Remove(kit, out Bitmap? stale)) DisposeKitArt(stale);
             KitPictureStatusText.IsVisible = false;
 
             RefreshKitWheel();
@@ -418,6 +457,33 @@ public partial class MainWindow
         _kitArtCache[kit] = art;
 
         return art;
+    }
+
+    /// <summary>Disposes a cached kit picture, unless a reel layer is still showing it.</summary>
+    /// <remarks>
+    /// Dropping a <see cref="Bitmap"/> from <see cref="_kitArtCache"/> without
+    /// disposing it just leaves the decode for the finalizer, so this is
+    /// called on both places the cache drops one — <see cref="SetKitImageAsync"/>
+    /// and the missing-art fetch's cache clear.
+    ///
+    /// The tiles that <see cref="RefreshKitWheel"/> builds are rebuilt in the
+    /// same call that clears the cache, so nothing there is left pointing at
+    /// a disposed picture for longer than the rest of that one method. The
+    /// two reel layers are different: <see cref="ReelImageA"/> and
+    /// <see cref="ReelImageB"/> are named elements that keep whatever picture
+    /// they last received — including after a roll settles and the reel
+    /// itself goes invisible — completely independently of the roster
+    /// rebuild. Disposing a bitmap still assigned to one of them would pull
+    /// the settled result's picture out from under it, so anything referenced
+    /// there is left alone and still finalizes normally.
+    /// </remarks>
+    private void DisposeKitArt(Bitmap? bitmap)
+    {
+        if (bitmap == null) return;
+        if (ReferenceEquals(bitmap, ReelImageA.Source)) return;
+        if (ReferenceEquals(bitmap, ReelImageB.Source)) return;
+
+        bitmap.Dispose();
     }
 
     // ---- opening and closing the roster ----
@@ -796,12 +862,19 @@ public partial class MainWindow
 
         int at = 0;
         var ticker = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(ReelFastMs) };
+        _kitRollTicker = ticker;
 
         ticker.Tick += (_, _) =>
         {
             if (at >= reel.Count)
             {
                 ticker.Stop();
+
+                // Cleared on the same path that stopped it, so a window
+                // close afterward finds nothing left to stop and a roll that
+                // finishes normally never leaks its timer.
+                _kitRollTicker = null;
+
                 Settle(winner);
                 return;
             }
