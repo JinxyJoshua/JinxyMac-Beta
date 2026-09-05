@@ -31,6 +31,7 @@
     <Compile Include="../Core/Palette.Tests.cs" />
     <Compile Include="../Core/SystemLoad.cs" />
     <Compile Include="../Core/SystemLoad.Tests.cs" />
+    <Compile Include="../Core/CorePurity.Tests.cs" />
     <Compile Include="../Capture/CaptureBackend.cs" />
     <Compile Include="../Capture/CaptureBackend.Tests.cs" />
     <Compile Include="../Core/RemoteConfig.cs" />
@@ -39,18 +40,70 @@
     <Compile Include="../Core/ClickButton.Tests.cs" />
     <Compile Include="../Core/Wallpaper.cs" />
     <Compile Include="../Core/Wallpaper.Tests.cs" />
+    <Compile Include="../Core/HotkeyBinding.cs" />
+    <Compile Include="../Core/KeyCodes.cs" />
+    <Compile Include="../Core/KeyCodes.Tests.cs" />
+    <Compile Include="../Core/KeyMacro.cs" />
+    <Compile Include="../Core/KeyMacro.Tests.cs" />
+    <Compile Include="../Core/KeyMacroDwell.Tests.cs" />
+    <Compile Include="../Core/KeyMacroWait.Tests.cs" />
+    <Compile Include="../Core/MacroRunner.Tests.cs" />
+    <Compile Include="../Core/SwitcherMacro.cs" />
+    <Compile Include="../Core/SwitcherMacro.Tests.cs" />
     <!-- Pulled in as dependencies of the above, not tested directly. -->
     <Compile Include="../Core/SettingsPath.cs" />
     <Compile Include="../Capture/Ffmpeg.cs" />
     <Compile Include="../Core/Clicker.cs" />
     <Compile Include="../Core/Clicker.Tests.cs" />
     <Compile Include="../Engine/IClickEngine.cs" />
+    <Compile Include="../Engine/IKeyEngine.cs" />
+    <Compile Include="../Core/KitWheel.cs" />
+    <Compile Include="../Core/KitWheel.Tests.cs" />
+    <Compile Include="../Core/KitImages.cs" />
+    <Compile Include="../Core/KitImages.Tests.cs" />
+    <Compile Include="../Core/KitArt.cs" />
+    <Compile Include="../Core/KitArt.Tests.cs" />
+    <Compile Include="../Core/KitArtFetch.cs" />
+    <!--
+      MainWindow.KitArt.cs is not part of Core: it uses Avalonia's Bitmap, an
+      Avalonia type, which is why this project below also needs Avalonia
+      itself. It is a standalone static class rather than a partial of
+      MainWindow, so it links in here without pulling in the window's other
+      dependencies.
+    -->
+    <Compile Include="../MainWindow.KitArt.cs" />
+    <Compile Include="../MainWindow.KitArt.Tests.cs" />
+    <!-- Owned by this project, not ported from Core: boots Avalonia's
+         headless Skia platform once before any test runs. -->
+    <Compile Include="AvaloniaHeadlessSetup.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <!--
+      Only needed because MainWindow.KitArt.cs decodes pictures through
+      Avalonia.Media.Imaging.Bitmap. Avalonia.Headless runs the real Skia
+      decoder against a fixture on disk without a window or a display.
+    -->
+    <PackageReference Include="Avalonia" Version="11.3.0" />
+    <PackageReference Include="Avalonia.Skia" Version="11.3.0" />
+    <PackageReference Include="Avalonia.Headless" Version="11.3.0" />
+    <PackageReference Include="Avalonia.Headless.XUnit" Version="11.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The WebP-under-a-wrong-extension fixture that caught the original
+         WPF decode bug; kept as evidence the same fixture still decodes
+         correctly under Avalonia/Skia. -->
+    <None Include="fixtures\**" CopyToOutputDirectory="PreserveNewest"
+          Link="fixtures\%(Filename)%(Extension)" />
+    <!-- One real shipped kit picture, referenced from Assets/Kits rather than
+         duplicated, so the end-to-end decode test resolves and reads the
+         actual file the app ships rather than a copy made for the test. -->
+    <None Include="../Assets/Kits/Abaddon.png" CopyToOutputDirectory="PreserveNewest"
+          Link="kits\Abaddon.png" />
   </ItemGroup>
 
 </Project>

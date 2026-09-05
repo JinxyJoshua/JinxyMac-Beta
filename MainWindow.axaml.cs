@@ -23,9 +23,11 @@ namespace JinxyMac;
 public partial class MainWindow : Window
 {
     private readonly IClickEngine _engine;
+    private readonly IKeyEngine _keys;
     private readonly IHotkeyWatcher _hotkeys;
     private readonly Clicker _clicker;
     private readonly Shaker _shaker;
+    private readonly MacroRunner _macros;
     private readonly ScreenRecorder _recorder = new();
     private readonly ReplayBuffer _replay = new();
     private readonly List<CaptureDevice> _screens = new();
@@ -84,11 +86,13 @@ public partial class MainWindow : Window
         if (OperatingSystem.IsMacOS())
         {
             _engine = new MacClickEngine();
+            _keys = new MacKeyEngine();
             _hotkeys = new MacHotkeyWatcher();
         }
         else if (OperatingSystem.IsWindows())
         {
             _engine = new WindowsClickEngine();
+            _keys = new WindowsKeyEngine();
             _hotkeys = new WindowsHotkeyWatcher();
         }
         else
@@ -107,6 +111,17 @@ public partial class MainWindow : Window
         // a press and its release and turning the click into a drag.
         _shaker = new Shaker(_engine, _clicker.InputGate);
 
+        _macros = new MacroRunner(_keys)
+        {
+            // Shares the clicker's gate, so a key cannot land between a mouse
+            // press and its release and turn the click into a drag.
+            InputGate = _clicker.InputGate,
+
+            // Lets a dip end when the weapon has actually fired rather than
+            // when a stopwatch says it probably has.
+            Clicks = () => _clicker.ClickCount
+        };
+
         WireNavigation();
         WireClicker();
         WireShake();
@@ -114,6 +129,9 @@ public partial class MainWindow : Window
         WireRecorder();
         WireHistory();
         WirePresets();
+        WireKitWheel();
+        WireMacros();
+        WireSwitcher();
         WireTheme();
         WireSettings();
         WireCache();
@@ -147,8 +165,22 @@ public partial class MainWindow : Window
             // and the stop is graceful precisely to avoid that.
             HideTray();
 
+            // Stops a kit-art fetch still running against the wiki from
+            // outliving the window it was fetching pictures for.
+            _kitArtCts.Cancel();
+            _kitArtCts.Dispose();
+
+            // A roll in flight has the same problem: its own DispatcherTimer
+            // only stops itself from inside its own Tick, so closing mid-roll
+            // would otherwise leave it ticking and calling Settle against
+            // controls that no longer exist.
+            _kitRollTicker?.Stop();
+            _kitRollTicker = null;
+            _kitRolling = false;
+
             _recorder.Dispose();
             _replay.Dispose();
+            _macros.Dispose();
             _clicker.Dispose();
             _shaker.Dispose();
             _hotkeys.Dispose();
@@ -169,6 +201,9 @@ public partial class MainWindow : Window
         Wire(NavHistory, PageHistory, "History", "Time spent clicking, and how much of it landed");
         Wire(NavTheme, PageTheme, "Theme", "Accent colour");
         Wire(NavSettings, PageSettings, "Settings", "Where things are stored, and what this build can do");
+        Wire(NavKitWheel, PageKitWheel, "Kit Wheel", "Roll a kit you have not played yet");
+        Wire(NavMacros, PageMacros, "Macros", "Spam a key, or cycle a few");
+        Wire(NavSwitcher, PageSwitcher, "Auto Switcher", "Swap between two hotbar slots");
 
         void Wire(RadioButton button, Control page, string title, string subtitle) =>
             button.IsCheckedChanged += (_, _) =>
@@ -185,6 +220,9 @@ public partial class MainWindow : Window
         PageHistory.IsVisible = ReferenceEquals(page, PageHistory);
         PageTheme.IsVisible = ReferenceEquals(page, PageTheme);
         PageSettings.IsVisible = ReferenceEquals(page, PageSettings);
+        PageKitWheel.IsVisible = ReferenceEquals(page, PageKitWheel);
+        PageMacros.IsVisible = ReferenceEquals(page, PageMacros);
+        PageSwitcher.IsVisible = ReferenceEquals(page, PageSwitcher);
 
         PageTitleText.Text = title;
         PageSubtitleText.Text = subtitle;
@@ -198,6 +236,21 @@ public partial class MainWindow : Window
         // the clicker runs, and redrawing sixty rows a second to show a page
         // nobody is looking at is work for nothing.
         if (ReferenceEquals(page, PageHistory)) RefreshHistory();
+
+        // Building the roster tiles, opening the kit list on a first-ever
+        // visit, and pulling down any pictures this install has not got, all
+        // belong to arriving on the page rather than to launch — someone who
+        // never opens it never pays for the decode or the bandwidth.
+        if (ReferenceEquals(page, PageKitWheel))
+        {
+            EnsureKitWheelBuilt();
+            OpenKitListIfNothingPicked();
+            _ = FetchMissingKitArtAsync();
+        }
+
+        if (ReferenceEquals(page, PageMacros)) EnsureMacrosBuilt();
+
+        if (ReferenceEquals(page, PageSwitcher)) RefreshSwitcherCard();
     }
 
     // ---- clicker ----
@@ -423,16 +476,53 @@ public partial class MainWindow : Window
         foreach (Action render in _readouts) render();
     }
 
+    /// <summary>
+    /// Everywhere the clicker's own stop paths converge: the ordinary hotkey
+    /// and the Start/Stop button and a hold-mode release (all through
+    /// <see cref="Toggle"/>), the combined shake hotkey (<see cref="ToggleCombo"/>,
+    /// which calls <see cref="Toggle"/> too), and the building hotkey
+    /// (<see cref="ToggleBuilding"/>).
+    /// </summary>
+    /// <remarks>
+    /// The auto switcher is a <see cref="KeyMacro"/> under its own reserved
+    /// name (see <see cref="SwitcherMacro.Name"/>), run by the same
+    /// <see cref="_macros"/> every other macro answers to — so the master hotkey kill, the Stop All
+    /// button, and closing the window already clear it for free, the same way
+    /// they already clear every other macro. What none of those already
+    /// touched is the clicker's own stop: before the switcher existed nothing
+    /// that stopped the clicker had any reason to know macros existed at all.
+    ///
+    /// That gap is exactly the bug the Windows build's history warns about:
+    /// the switcher is a latch of its own, so every stop that was not its own
+    /// hotkey used to leave it running, still swapping weapons with nothing
+    /// left clicking — worse than useless mid-fight. This is the one place
+    /// the clicker's own stops already meet (Toggle and ToggleBuilding used to
+    /// repeat the same three lines separately, which is what made it easy for
+    /// one of them to forget something the other did), so it is the one place
+    /// this needs adding rather than three.
+    ///
+    /// Flips the checkbox rather than stopping the macro directly, for the
+    /// same reason <c>SwitcherEnabled</c>'s own change handler exists: the
+    /// page and the runner must not be able to disagree about whether the
+    /// switcher is running.
+    /// </remarks>
+    private void StopClicker()
+    {
+        _building = false;
+        _clicker.Stop();
+
+        // A session's worth of totals reaches the disk when the session
+        // ends, rather than once a second while it runs.
+        FlushHistory();
+
+        SwitcherEnabled.IsChecked = false;
+    }
+
     private void Toggle()
     {
         if (_clicker.IsRunning)
         {
-            _building = false;
-            _clicker.Stop();
-
-            // A session's worth of totals reaches the disk when the session
-            // ends, rather than once a second while it runs.
-            FlushHistory();
+            StopClicker();
         }
         else
         {
@@ -725,6 +815,12 @@ public partial class MainWindow : Window
             _settings.ReplayName = name;
         });
 
+        Bind(SwitcherHotkeyButton, "switcher", (code, name) =>
+        {
+            _settings.SwitcherHotkeyCode = code;
+            _settings.SwitcherHotkeyName = name;
+        });
+
         BuildRateText.Text =
             $"Fixed {Clicker.BuildCps:0} CPS at {Clicker.BuildDuty * 100:0}% — Ignores the sliders";
     }
@@ -737,10 +833,20 @@ public partial class MainWindow : Window
     /// does the top one rather than both. Nothing prevents that binding — it is
     /// the user's key and they may have meant it — but doing two things at once
     /// would not be what anyone meant.
+    ///
+    /// A key any running macro is currently sending is refused before any of
+    /// that: on macOS the watcher reads key state off the same HID source
+    /// this app's own synthetic presses go through (see
+    /// <c>MacHotkeyWatcher.Poll</c>'s remarks), so without this a macro
+    /// cycling through a hotkey's own code — the switcher alternating 1 and 2
+    /// while a clicker hotkey sits on 1, say — would retrigger that hotkey on
+    /// every cycle. The switcher is a <see cref="KeyMacro"/> too, so this
+    /// covers it the same way.
     /// </remarks>
     private void Fire(int code)
     {
         if (code == 0) return;
+        if (_macros.RunningKeys().Contains(code)) return;
 
         if (code == _settings.HotkeyCode)
         {
@@ -759,6 +865,8 @@ public partial class MainWindow : Window
         else if (code == _settings.BuildCode) ToggleBuilding();
         else if (code == _settings.RecordCode) _ = ToggleRecording();
         else if (code == _settings.ReplayCode) _ = SaveReplay();
+        else if (code == _settings.SwitcherHotkeyCode) ToggleSwitcherHotkey();
+        else if (MacroWithHotkey(code) is KeyMacro macro) ToggleMacroHotkey(macro);
     }
 
     /// <summary>Stops the clicker when the held key comes back up.</summary>
@@ -803,13 +911,38 @@ public partial class MainWindow : Window
             {
                 _rebinding = false;
 
+                // Code 0 is both "not set" and, on macOS, the A key's real code
+                // (see HotkeyBinding.Unbound) — so a press of A here has to be
+                // refused with an explanation, the same one BindMacroHotkey
+                // gives, rather than stored as a hotkey that looks bound ("A")
+                // but can never fire: MacHotkeyWatcher.Bindable(0) is false, so
+                // ArmHotkeys never actually watches it, and Fire() returns
+                // early on code 0 anyway — a dead hotkey that displays as set.
+                if (code == 0)
+                {
+                    button.Content = previous;
+
+                    HotkeyNoticeText.Text = MacroStore.UnbindableAMessage;
+                    HotkeyNoticeText.IsVisible = true;
+                    return;
+                }
+
                 // One key, one action. Bound twice, only the first would ever
                 // run — which reads as a hotkey that quietly stopped working
                 // rather than as a clash, so it is refused by name instead.
+                //
+                // Checked against the macros' hotkeys too, not just the other
+                // four fixed ones: Fire()'s if/else-if chain tries these fixed
+                // hotkeys before it ever looks at a macro's, so a fixed key
+                // rebound onto a key a macro already owns would permanently
+                // shadow that macro — it would still look bound on its card
+                // and fire nothing. BindMacroHotkey already refuses the other
+                // direction; this is what makes the two agree.
                 string? taken = Bindings()
                     .Where(b => b.Code == code && b.Action != action)
                     .Select(b => b.Action)
-                    .FirstOrDefault();
+                    .FirstOrDefault()
+                    ?? MacroStore.FindByHotkeyCode(_macroList, code)?.Name;
 
                 if (taken != null)
                 {
@@ -843,7 +976,8 @@ public partial class MainWindow : Window
         ("clicker + shake", _settings.ComboCode, _settings.ComboName),
         ("building", _settings.BuildCode, _settings.BuildName),
         ("record", _settings.RecordCode, _settings.RecordName),
-        ("save replay", _settings.ReplayCode, _settings.ReplayName)
+        ("save replay", _settings.ReplayCode, _settings.ReplayName),
+        ("switcher", _settings.SwitcherHotkeyCode, _settings.SwitcherHotkeyName)
     };
 
     /// <summary>
@@ -859,16 +993,36 @@ public partial class MainWindow : Window
     {
         bool on = HotkeysEnabled.IsChecked == true;
 
+        // Macros bring their own toggle hotkeys into the same watch list —
+        // one watcher for every bindable key rather than a second mechanism
+        // polling alongside it. A disabled macro's key is left out entirely
+        // rather than watched-and-ignored, so it stays free for anything else
+        // while the macro it would have toggled cannot be started at all.
         _hotkeys.Watch(on
             ? new[]
             {
                 _settings.HotkeyCode, _settings.ComboCode, _settings.BuildCode,
-                _settings.RecordCode, _settings.ReplayCode
-            }
+                _settings.RecordCode, _settings.ReplayCode, _settings.SwitcherHotkeyCode
+            }.Concat(MacroHotkeyCodes())
             : Array.Empty<int>());
+
+        // Nothing may keep running once the only switch that could stop it is
+        // greyed out. The macro cards disable their own toggle for the same
+        // reason — see RefreshMacroCards.
+        if (!on)
+        {
+            _macros.StopAll();
+
+            // Through the checkbox rather than the runner alone, same as
+            // StopClicker — otherwise the switcher's own page would still
+            // read "on" for a macro that just stopped.
+            SwitcherEnabled.IsChecked = false;
+        }
 
         RefreshHotkeySummary();
         RefreshStatus();
+        RefreshMacroCards();
+        RefreshSwitcherCard();
 
         if (_loading) return;
 
@@ -912,9 +1066,7 @@ public partial class MainWindow : Window
     {
         if (_clicker.IsRunning)
         {
-            _building = false;
-            _clicker.Stop();
-            FlushHistory();
+            StopClicker();
         }
         else
         {
@@ -976,6 +1128,8 @@ public partial class MainWindow : Window
         HotkeyButton.Content = _settings.HotkeyName;
         ComboHotkeyButton.Content = _settings.ComboName;
         BuildHotkeyButton.Content = _settings.BuildName;
+
+        ApplySwitcherSettings();
 
         ArmHotkeys();
 

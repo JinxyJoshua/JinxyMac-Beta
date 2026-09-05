@@ -55,6 +55,32 @@ public sealed class AppSettings
     public int ReplayCode { get; set; }
     public string ReplayName { get; set; } = "Not set";
 
+    /// <summary>Turns the auto switcher on and off from inside the game.</summary>
+    public int SwitcherHotkeyCode { get; set; }
+    public string SwitcherHotkeyName { get; set; } = "Not set";
+
+    /// <summary>The first slot the switcher presses — a hotbar key, typed as a single letter or digit.</summary>
+    public string SwitcherSlotA { get; set; } = "3";
+
+    /// <summary>The second slot. Typically the one held longer — see <see cref="SwitcherIntervalBMs"/>.</summary>
+    public string SwitcherSlotB { get; set; } = "1";
+
+    /// <summary>How long to hold the first slot, before it is raised to whatever the clicker's own rate demands.</summary>
+    public int SwitcherIntervalMs { get; set; } = 150;
+
+    /// <summary>How long to hold the second slot.</summary>
+    public int SwitcherIntervalBMs { get; set; } = 900;
+
+    /// <summary>How long the game takes to put a weapon in hand — see <see cref="KeyMacro.MinimumDwellMs"/>.</summary>
+    public int SwitcherEquipMs { get; set; } = 60;
+
+    /// <summary>
+    /// The switcher's own switch, independent of the master hotkeys toggle —
+    /// see <see cref="KeyMacro.Enabled"/>'s remarks for why a macro (and the
+    /// switcher is one) gets this in addition to the master kill.
+    /// </summary>
+    public bool SwitcherDisabled { get; set; }
+
     public int RecordFps { get; set; } = 60;
 
     public bool ReplayEnabled { get; set; }

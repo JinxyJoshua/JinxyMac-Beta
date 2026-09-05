@@ -10,6 +10,9 @@
   "_recorderEnabled": "Set false to switch the recorder off everywhere, if ffmpeg or Screen Recording turns out to be broken.",
   "recorderEnabled": true,
 
+  "_kitArtFetchEnabled": "Set false to stop the kit wheel fetching missing kit pictures from the wiki, if it ever starts saving something broken.",
+  "kitArtFetchEnabled": true,
+
   "_notice": "A short line shown in the app - for saying a problem is known and a fix is coming. Empty means nothing is shown. Max 200 characters.",
   "notice": ""
 }

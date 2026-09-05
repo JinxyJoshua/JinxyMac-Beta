@@ -18,6 +18,7 @@ public class RemoteConfigTests
         Assert.Equal(ClickTimings.DefaultHitFixMinDownMs, c.HitFixMinDownMs);
         Assert.Equal(ClickTimings.DefaultHitFixMinUpMs, c.HitFixMinUpMs);
         Assert.True(c.RecorderEnabled);
+        Assert.True(c.KitArtFetchEnabled);
         Assert.Equal("", c.Notice);
     }
 
@@ -60,6 +61,7 @@ public class RemoteConfigTests
             ClickTimings.DefaultHitFixMinDownMs,
             RemoteConfig.Parse("{\"hitFixMinDownMs\": \"twelve\"}").HitFixMinDownMs);
         Assert.True(RemoteConfig.Parse("{\"recorderEnabled\": \"no\"}").RecorderEnabled);
+        Assert.True(RemoteConfig.Parse("{\"kitArtFetchEnabled\": \"no\"}").KitArtFetchEnabled);
     }
 
     [Fact]
@@ -75,6 +77,12 @@ public class RemoteConfigTests
     public void RecorderCanBeSwitchedOff()
     {
         Assert.False(RemoteConfig.Parse("{\"recorderEnabled\": false}").RecorderEnabled);
+    }
+
+    [Fact]
+    public void KitArtFetchCanBeSwitchedOff()
+    {
+        Assert.False(RemoteConfig.Parse("{\"kitArtFetchEnabled\": false}").KitArtFetchEnabled);
     }
 
     [Fact]

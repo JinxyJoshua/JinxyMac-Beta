@@ -60,6 +60,31 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!--
+      Shipped as loose files rather than AvaloniaResource. KitImages.Find,
+      Set and Remove (Core/KitImages.cs, ported unchanged from the Windows
+      app) work by File.Exists, File.Copy and File.Delete against a real path
+      on disk. An AvaloniaResource is an embedded manifest resource with no
+      file behind it at all — reachable only through avares:// and
+      AssetLoader — so those calls would find nothing. Content keeps the
+      lookup working with no change to Core.
+
+      Link rewrites the copied path from Assets\Kits\Foo.png to kits\Foo.png
+      in the output, matching where KitImages.ShippedFolder() already looks
+      (AppContext.BaseDirectory/kits — the folder name Setup used on
+      Windows, kept as-is here rather than renamed to match the source
+      folder). Packaging/build-mac.sh publishes straight into the .app's
+      Contents/MacOS/<arch> folder, so this is also where the executable
+      itself ends up, and AppContext.BaseDirectory at runtime is that same
+      folder.
+    -->
+    <None Update="Assets\Kits\*.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>kits\%(Filename)%(Extension)</Link>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.3.0" />
     <PackageReference Include="Avalonia.Desktop" Version="11.3.0" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.0" />

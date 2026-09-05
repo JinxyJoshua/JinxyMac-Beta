@@ -139,7 +139,23 @@ public sealed class Clicker : IDisposable
         finally
         {
             // The one that was pressed, whatever is selected now.
-            if (held is ClickButton stuck) _engine.MouseUp(stuck);
+            //
+            // This release only runs because a send already threw, and the
+            // usual reason — Accessibility permission revoked mid-run — is
+            // still true here, so the release is likely to throw the same
+            // way. Guarded because that second throw has nowhere left to go
+            // but out of this background thread, which kills the process —
+            // exactly what the catch above exists to prevent.
+            if (held is ClickButton stuck)
+            {
+                try { _engine.MouseUp(stuck); }
+                catch
+                {
+                    // See above: the release can fail for the same reason
+                    // the send did, and must not be allowed to take the
+                    // process down with it.
+                }
+            }
         }
     }
 

@@ -59,43 +59,6 @@ public sealed class MacClickEngine : IClickEngine
         _ => (EventLeftMouseDown, EventLeftMouseUp, MouseButtonLeft)
     };
 
-    /// <summary>
-    /// The event source every event is posted from, built once.
-    /// </summary>
-    /// <remarks>
-    /// Created rather than passing null, for one reason that matters more than
-    /// the rest: a source has a local events suppression interval, and it
-    /// defaults to a quarter of a second. For that long after each synthetic
-    /// event macOS ignores the real mouse and keyboard.
-    ///
-    /// A quarter second is nothing when a script clicks once. This posts an
-    /// event every fifty milliseconds at twenty CPS, so the window never
-    /// closes and the machine stops seeing its own user — including the hotkey
-    /// meant to stop the clicker. Setting the interval to zero is the whole
-    /// point of owning the source.
-    /// </remarks>
-    private static readonly IntPtr Source = CreateSource();
-
-    private static IntPtr CreateSource()
-    {
-        try
-        {
-            IntPtr source = CGEventSourceCreate(SourceStateHidSystem);
-
-            // Never released: it lives as long as the process, and there is
-            // nowhere sensible to free it that is not process exit.
-            if (source != IntPtr.Zero) CGEventSourceSetLocalEventsSuppressionInterval(source, 0.0);
-
-            return source;
-        }
-        catch
-        {
-            // Null is a valid source argument — it just means the default one,
-            // suppression interval and all. Worse, but still clicking.
-            return IntPtr.Zero;
-        }
-    }
-
     public void MoveBy(int dx, int dy)
     {
         if (dx == 0 && dy == 0) return;
@@ -110,7 +73,7 @@ public sealed class MacClickEngine : IClickEngine
 
         try
         {
-            move = CGEventCreateMouseEvent(Source, EventMouseMoved, to, MouseButtonLeft);
+            move = CGEventCreateMouseEvent(MacEventSource.Handle, EventMouseMoved, to, MouseButtonLeft);
             if (move == IntPtr.Zero) return;
 
             // Carrying the delta as well as the destination matters for games
@@ -151,7 +114,7 @@ public sealed class MacClickEngine : IClickEngine
 
         try
         {
-            click = CGEventCreateMouseEvent(Source, down ? downType : upType, Location(), number);
+            click = CGEventCreateMouseEvent(MacEventSource.Handle, down ? downType : upType, Location(), number);
             if (click == IntPtr.Zero) return;
 
             CGEventSetIntegerValueField(click, EventFieldClickState, 1);
@@ -224,9 +187,6 @@ public sealed class MacClickEngine : IClickEngine
     private const int EventFieldDeltaX = 4;
     private const int EventFieldDeltaY = 5;
 
-    /// <summary>Hardware state, the same source the real mouse reports through.</summary>
-    private const uint SourceStateHidSystem = 1;
-
     private const string ApplicationServices =
         "/System/Library/Frameworks/ApplicationServices.framework/ApplicationServices";
 
@@ -251,12 +211,6 @@ public sealed class MacClickEngine : IClickEngine
 
     [DllImport(ApplicationServices)]
     private static extern void CGEventSetDoubleValueField(IntPtr theEvent, int field, double value);
-
-    [DllImport(ApplicationServices)]
-    private static extern IntPtr CGEventSourceCreate(uint stateId);
-
-    [DllImport(ApplicationServices)]
-    private static extern void CGEventSourceSetLocalEventsSuppressionInterval(IntPtr source, double seconds);
 
     [DllImport(ApplicationServices)]
     [return: MarshalAs(UnmanagedType.I1)]
