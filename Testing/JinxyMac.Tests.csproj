@@ -43,12 +43,15 @@
     <Compile Include="../Core/KeyMacro.cs" />
     <Compile Include="../Core/KeyMacro.Tests.cs" />
     <Compile Include="../Core/KeyMacroDwell.Tests.cs" />
+    <Compile Include="../Core/KeyMacroWait.Tests.cs" />
+    <Compile Include="../Core/MacroRunner.Tests.cs" />
     <!-- Pulled in as dependencies of the above, not tested directly. -->
     <Compile Include="../Core/SettingsPath.cs" />
     <Compile Include="../Capture/Ffmpeg.cs" />
     <Compile Include="../Core/Clicker.cs" />
     <Compile Include="../Core/Clicker.Tests.cs" />
     <Compile Include="../Engine/IClickEngine.cs" />
+    <Compile Include="../Engine/IKeyEngine.cs" />
   </ItemGroup>
 
   <ItemGroup>

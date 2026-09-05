@@ -1,6 +1,8 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using JinxyMac.Engine;
 
 namespace JinxyMac.Core;
 
@@ -168,6 +170,380 @@ public sealed class KeyMacro
     public string SummaryText => Keys.Length > 1
         ? $"{KeysText}  ·  {RateText}  ·  cycles"
         : $"{KeysText}  ·  {RateText}";
+}
+
+/// <summary>
+/// Sends the keys, on its own thread, until told to stop.
+/// </summary>
+/// <remarks>
+/// A thread per running macro rather than one scheduler. Nobody runs twenty of
+/// these — two is the realistic maximum — and a scheduler would be more code
+/// to get wrong for no benefit anyone would notice.
+/// </remarks>
+public sealed class MacroRunner : IDisposable
+{
+    private readonly IKeyEngine _engine;
+
+    private readonly Dictionary<string, CancellationTokenSource> _running = new();
+
+    private long _sent;
+
+    public MacroRunner(IKeyEngine engine) => _engine = engine;
+
+    public bool IsRunning(string name) => _running.ContainsKey(name);
+
+    public int RunningCount => _running.Count;
+
+    /// <summary>How many key presses have actually gone out.</summary>
+    /// <remarks>
+    /// Counts sends, not ticks. A macro that is running but suppressed reads
+    /// zero here, which is the difference between "it is not working" and "it
+    /// is working and you are looking at the wrong window".
+    /// </remarks>
+    public long Sent => Interlocked.Read(ref _sent);
+
+    /// <summary>
+    /// Asked before every press. True means skip this one.
+    /// </summary>
+    /// <remarks>
+    /// This exists because a macro types into whatever is focused, and while
+    /// somebody is setting one up that is this application — the keys land in
+    /// the very boxes being edited, whose change handler restarts the macro,
+    /// and it spends its life fighting itself instead of reaching the game.
+    ///
+    /// Called on the macro thread, so whatever is behind it must be safe to
+    /// call from anywhere.
+    /// </remarks>
+    public Func<bool>? Suppressed { get; set; }
+
+    /// <summary>
+    /// The clicker's input gate, so a key never lands inside a click.
+    /// </summary>
+    /// <remarks>
+    /// The same lock the shake engine takes, and for the same reason. The
+    /// clicker holds it between a mouse-down and its release; anything injected
+    /// in that window arrives mid-click, and the game sees an interrupted press
+    /// rather than a click and a keystroke.
+    ///
+    /// It is why switching by hand fires fast and switching automatically does
+    /// not: a human presses the key between clicks by luck of timing, and a
+    /// timer lands wherever it lands.
+    /// </remarks>
+    public object? InputGate { get; set; }
+
+    /// <summary>
+    /// How long a key is held down.
+    /// </summary>
+    /// <remarks>
+    /// The same problem HitFix solves for the mouse. A press that goes down and
+    /// up in the same instant falls between two frames of a game reading input
+    /// once a frame, and is never observed at all — the switch either does not
+    /// happen or happens unreliably. Fifteen milliseconds clears a 60fps frame
+    /// and is far too short to notice.
+    /// </remarks>
+    private const int HoldMs = 15;
+
+    /// <summary>Longest to wait for a click to finish before going anyway.</summary>
+    /// <remarks>
+    /// Sent regardless on timeout, deliberately. A split click costs one click;
+    /// a missed switch leaves the wrong weapon in hand, which costs the fight.
+    /// </remarks>
+    private const int GateWaitMs = 250;
+
+    public void Start(KeyMacro macro)
+    {
+        // Refused here rather than only in the UI, so nothing can start a
+        // disabled macro by any route — its key, its switch, or a restore on
+        // launch. Disabled means it does not run, not that one button is grey.
+        if (!macro.Enabled || !macro.IsUsable || _running.ContainsKey(macro.Name)) return;
+
+        var cts = new CancellationTokenSource();
+        _running[macro.Name] = cts;
+
+        CancellationToken token = cts.Token;
+
+        new Thread(() => Loop(macro, token))
+        {
+            IsBackground = true,
+            // Matched to the click engine. At default priority this thread was
+            // descheduled under load, which made its sleeps overrun, which made
+            // it spin longer to catch up — the stutter fed itself.
+            Priority = ThreadPriority.AboveNormal,
+            Name = "Macro:" + macro.Name
+        }.Start();
+
+        Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// Raised whenever the set of running macros changes.
+    /// </summary>
+    /// <remarks>
+    /// So that anything reflecting that state cannot fall out of step with it.
+    /// Macros are started and stopped from a dozen places — a card's switch, a
+    /// hotkey on the polling thread, the master kill, deleting a macro, closing
+    /// the app — and an on-screen badge still claiming a macro is running after
+    /// it stopped is worse than showing nothing at all.
+    ///
+    /// Raised on whichever thread made the change, including the poll thread,
+    /// so a UI handler has to marshal.
+    /// </remarks>
+    public event Action? Changed;
+
+    public void Stop(string name)
+    {
+        if (!_running.TryGetValue(name, out CancellationTokenSource? cts)) return;
+
+        cts.Cancel();
+        _running.Remove(name);
+
+        Changed?.Invoke();
+    }
+
+    public void StopAll()
+    {
+        if (_running.Count == 0) return;
+
+        foreach (CancellationTokenSource cts in _running.Values) cts.Cancel();
+
+        _running.Clear();
+
+        Changed?.Invoke();
+    }
+
+    private void Loop(KeyMacro macro, CancellationToken token)
+    {
+        int at = 0;
+
+        // The one key that might still be down mid-send. SendGated always
+        // pairs its own down and up, so this is cleared the instant it
+        // returns normally — it is only ever read by the rescue below, for
+        // the case where a send throws between the two.
+        int? held = null;
+
+        // The Windows build raised the system timer resolution and opted out
+        // of background throttling here, so a sleep could land within a
+        // millisecond instead of the scheduler's default ~15.6 ms tick. Both
+        // calls were Win32-specific (winmm's TimeBeginPeriod and a Windows-only
+        // process throttling API) and are not carried across.
+        try
+        {
+            while (!token.IsCancellationRequested)
+            {
+                // Suppressed rather than paused: the cycle still advances, so
+                // alt-tabbing away and back does not leave it stuck on one key.
+                if (Suppressed?.Invoke() != true)
+                {
+                    int code = macro.Keys[at];
+                    held = code;
+                    SendGated(code, token);
+                    held = null;
+                    Interlocked.Increment(ref _sent);
+                }
+
+                int dwell = macro.DwellFor(at);
+                bool firing = at == 0 && macro.ClicksWanted > 0 && Clicks != null;
+
+                at = (at + 1) % macro.Keys.Length;
+
+                if (firing) WaitForShots(macro, dwell, token);
+                else Wait(dwell, token);
+            }
+        }
+        catch
+        {
+            // A failed send must not take the thread — or the app — with it.
+        }
+        finally
+        {
+            // The one that was pressed, if a send failed before its own
+            // release ran. Matches what Clicker.Loop does for the mouse
+            // button, and for the same reason: a key left down in a game is
+            // the keyboard equivalent of a button stuck across the desktop.
+            if (held is int stuck) Gated(() => _engine.KeyUp(stuck));
+        }
+    }
+
+    /// <summary>
+    /// The clicker's running total of delivered clicks.
+    /// </summary>
+    /// <remarks>
+    /// Read, never written. It is what lets a dip end when the weapon has
+    /// actually fired rather than when a stopwatch says it probably has.
+    /// </remarks>
+    public Func<long>? Clicks { get; set; }
+
+    /// <summary>
+    /// Waits out a span accurately, rather than approximately.
+    /// </summary>
+    /// <remarks>
+    /// Thread.Sleep returns when the scheduler next gets round to it, not when
+    /// the time is up. Even with the timer at 1 ms each call overshoots, and a
+    /// dwell slept in slices compounds every one of them — a 150 ms crossbow
+    /// dip built from thirty 5 ms sleeps measured 165-180 ms, long enough to
+    /// cost the swing it was supposed to leave time for.
+    ///
+    /// So the bulk is slept a millisecond at a time and the last stretch is
+    /// spun. How long that stretch needs to be depends on the system timer,
+    /// which this cannot assume anything about — the loop raises it to 1 ms,
+    /// but a caller outside that, a test included, gets the ~15.6 ms default.
+    /// So the tail is not a constant: each sleep is measured, and the longest
+    /// one seen becomes the distance at which sleeping stops being safe. A
+    /// coarse timer teaches it on the first sleep and costs one overshoot.
+    /// </remarks>
+    /// <returns>False if cancellation was observed.</returns>
+    internal static bool Wait(double ms, CancellationToken token)
+    {
+        if (ms <= 0) return !token.IsCancellationRequested;
+
+        long freq = Stopwatch.Frequency;
+        long deadline = Stopwatch.GetTimestamp() + (long)(ms * freq / 1000.0);
+        double tail = SpinTailMs;
+
+        var spin = new SpinWait();
+
+        while (true)
+        {
+            if (token.IsCancellationRequested) return false;
+
+            long now = Stopwatch.GetTimestamp();
+            double remaining = (deadline - now) * 1000.0 / freq;
+            if (remaining <= 0) return true;
+
+            if (remaining <= tail)
+            {
+                // SpinOnce rather than a bare SpinWait: it starts by spinning
+                // and then begins yielding, so a wait that runs long gives the
+                // core back to the game instead of holding it. The -1 disables
+                // its escalation to Sleep(1), which would overshoot by more
+                // than the whole tail it is trying to land inside.
+                spin.SpinOnce(sleep1Threshold: -1);
+                continue;
+            }
+
+            spin.Reset();
+
+            Thread.Sleep(1);
+
+            // What that sleep actually cost, which is the floor on how close a
+            // sleep can get us. Anything nearer than this has to be spun.
+            //
+            // Capped, and the cap is the fix for a real problem: this only ever
+            // grew. One slow sleep — a scheduler hiccup, or the timer not raised
+            // yet at 15.6 ms — set the tail to that, and from then on every
+            // interval shorter than it was spun end to end. A macro with a short
+            // dwell would burn a whole core for as long as it ran, which is what
+            // the in-game stutter was. Past the cap it is better to overshoot a
+            // press slightly than to take a core off the game.
+            double slept = (Stopwatch.GetTimestamp() - now) * 1000.0 / freq;
+            if (slept > tail) tail = Math.Min(slept, MaxSpinTailMs);
+        }
+    }
+
+    /// <summary>
+    /// The most of an interval that may be spent spinning.
+    /// </summary>
+    /// <remarks>
+    /// With the timer raised a sleep lands within about a millisecond, so this
+    /// is roughly twice what is ever needed. It exists to bound the damage when
+    /// a sleep does not land — not to be reached in normal running.
+    /// </remarks>
+    private const double MaxSpinTailMs = 2.0;
+
+    /// <summary>
+    /// Shortest stretch spun rather than slept, before measurement widens it.
+    /// </summary>
+    private const double SpinTailMs = 1.2;
+
+    /// <summary>
+    /// Stays on the weapon until it has actually been clicked, then leaves.
+    /// </summary>
+    /// <remarks>
+    /// As short as it can be while still firing, which is the whole point. Time
+    /// on the crossbow is time the sword is not swinging, and this game is
+    /// scored in hits — so the dip ends on the click that fires it rather than
+    /// on a timer that has to be generous to be safe.
+    ///
+    /// The configured hold is a ceiling, not a target. If the clicks never
+    /// arrive — clicker switched off, a click rate slower than the hold — it
+    /// gives up and moves on rather than parking on one weapon for ever.
+    /// </remarks>
+    private void WaitForShots(KeyMacro macro, int ceilingMs, CancellationToken token)
+    {
+        if (!Wait(macro.EquipMs, token)) return;
+
+        long from = Clicks?.Invoke() ?? 0;
+        int remaining = Math.Max(0, ceilingMs - macro.EquipMs);
+        long deadline = Stopwatch.GetTimestamp() + (long)(remaining * Stopwatch.Frequency / 1000.0);
+
+        // Polled fine enough that the dip ends on the click rather than up to a
+        // slice after it. At 40 clicks a second they arrive 25 ms apart, so a
+        // millisecond of detection lag is the difference between leaving on the
+        // shot and leaving a slice late, every single swap.
+        while (Stopwatch.GetTimestamp() < deadline)
+        {
+            if (token.IsCancellationRequested) return;
+
+            if ((Clicks?.Invoke() ?? 0) - from >= macro.ClicksWanted) return;
+
+            Thread.Sleep(1);
+        }
+    }
+
+    /// <summary>
+    /// Presses the key without splitting a click in half.
+    /// </summary>
+    /// <remarks>
+    /// Takes the clicker's gate if there is one, so the whole press and release
+    /// happens between two clicks rather than inside one. Waiting costs a few
+    /// milliseconds on a switch that happens twice a second; not waiting costs
+    /// the click it lands in the middle of.
+    /// </remarks>
+    private void SendGated(int code, CancellationToken token)
+    {
+        Gated(() => _engine.KeyDown(code));
+
+        // Outside the gate. The clicker is free to click while a key is held —
+        // that is just clicking with a key down, which is what a hand does.
+        Wait(HoldMs, token);
+
+        Gated(() => _engine.KeyUp(code));
+    }
+
+    /// <summary>
+    /// Runs one send between clicks rather than inside one.
+    /// </summary>
+    /// <remarks>
+    /// Around each individual event, never across the hold between them. Held
+    /// for the whole press this blocks the click loop for the full hold time on
+    /// every swap — three percent of clicks at a half-second rotation, and a
+    /// quarter of them at the fast rates the switch technique actually wants.
+    /// A feature that costs hits in a game measured in hits is worse than no
+    /// feature, so the lock is taken for microseconds and released.
+    /// </remarks>
+    private void Gated(Action send)
+    {
+        object? gate = InputGate;
+
+        if (gate == null)
+        {
+            send();
+            return;
+        }
+
+        bool held = Monitor.TryEnter(gate, GateWaitMs);
+
+        try
+        {
+            send();
+        }
+        finally
+        {
+            if (held) Monitor.Exit(gate);
+        }
+    }
+
+    public void Dispose() => StopAll();
 }
 
 /// <summary>
