@@ -153,11 +153,8 @@ public partial class MainWindow
         string? fixedHolder = Bindings().Where(b => b.Code == code).Select(b => b.Action).FirstOrDefault();
         if (fixedHolder != null) return fixedHolder;
 
-        foreach (KeyMacro m in _macroList)
-        {
-            if (ReferenceEquals(m, excludingMacro)) continue;
-            if (m.Hotkey.IsValid && m.Hotkey.Code == code) return m.Name;
-        }
+        string? macroHolder = MacroStore.FindByHotkeyCode(_macroList, code, excludingMacro)?.Name;
+        if (macroHolder != null) return macroHolder;
 
         if (excludingMacro != null && _pendingNewMacroHotkey.IsValid && _pendingNewMacroHotkey.Code == code)
             return "new macro";
@@ -314,7 +311,7 @@ public partial class MainWindow
 
         if (name.Length == 0)
         {
-            ShowMacroError("Give it a name.");
+            ShowMacroNotice("Give it a name.");
             return;
         }
 
@@ -330,7 +327,7 @@ public partial class MainWindow
 
         if (keys == null)
         {
-            ShowMacroError(MentionsUnbindableA(typed)
+            ShowMacroNotice(MentionsUnbindableA(typed)
                 ? UnbindableAMessage
                 : "Each key box takes one letter or digit — R, or 1, or Q.");
             return;
@@ -340,9 +337,18 @@ public partial class MainWindow
 
         if (interval == null)
         {
-            ShowMacroError($"Interval must be between {KeyMacro.MinIntervalMs} and {KeyMacro.MaxIntervalMs} ms.");
+            ShowMacroNotice($"Interval must be between {KeyMacro.MinIntervalMs} and {KeyMacro.MaxIntervalMs} ms.");
             return;
         }
+
+        // Saving under a name that is already taken is how editing works —
+        // MacroStore.Upsert replaces the same-named macro wholesale. Found
+        // *before* Upsert runs so the hotkey it would otherwise silently wipe
+        // (the New Macro form's own slot defaults to Unbound) can be carried
+        // over instead, and so the user is told either way. See
+        // MacroStore.ResolveSaveHotkey for why.
+        KeyMacro? existing = MacroStore.Find(_macroList, name);
+        (HotkeyBinding hotkey, string? replaceNotice) = MacroStore.ResolveSaveHotkey(existing, _pendingNewMacroHotkey);
 
         // Replacing a running macro would otherwise leave the old thread going
         // with the old keys, invisibly, its card having been rebuilt.
@@ -350,7 +356,7 @@ public partial class MainWindow
 
         MacroStore.Upsert(_macroList, new KeyMacro(
             name, keys.Value.Keys, keys.Value.Text, interval.Value,
-            hotkey: _pendingNewMacroHotkey));
+            hotkey: hotkey));
         MacroStore.Save(_macroList);
 
         MacroNameBox.Text = "";
@@ -364,9 +370,18 @@ public partial class MainWindow
         NewMacroHotkeyButton.Content = "Not set";
 
         ArmHotkeys();
+
+        if (replaceNotice != null) ShowMacroNotice(replaceNotice);
     }
 
-    private void ShowMacroError(string message)
+    /// <summary>
+    /// The New Macro form's one message line — a validation problem, or, after
+    /// a successful save, something worth knowing about what just happened
+    /// (a same-named macro replaced, a hotkey carried over). One box for
+    /// both: only one of them is ever true at a time, since a save that fails
+    /// validation never reaches the replace notice.
+    /// </summary>
+    private void ShowMacroNotice(string message)
     {
         MacroErrorText.Text = message;
         MacroErrorText.IsVisible = true;

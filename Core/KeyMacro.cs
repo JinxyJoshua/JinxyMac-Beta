@@ -702,6 +702,70 @@ public static class MacroStore
         else macros.Add(macro);
     }
 
+    /// <summary>The macro already saved under this name, or null when none is.</summary>
+    /// <remarks>
+    /// Same case-insensitive match <see cref="Upsert"/> replaces by. Exposed
+    /// separately so the page can find out *before* calling Upsert that a
+    /// replacement is about to happen, without Upsert itself having to report
+    /// what it clobbered.
+    /// </remarks>
+    public static KeyMacro? Find(IEnumerable<KeyMacro> macros, string name) =>
+        macros.FirstOrDefault(m => string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// The hotkey Save should actually write, and the line to show for it,
+    /// when the typed name matches a macro that already exists.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="Upsert"/> replaces a same-named macro wholesale — including
+    /// its hotkey — and that is deliberate, it is what makes editing work. The
+    /// New Macro form's own hotkey slot defaults to
+    /// <see cref="HotkeyBinding.Unbound"/> though, so saving under an existing
+    /// name with nothing picked in that slot would otherwise silently wipe a
+    /// working hotkey: the macro would look fine and its key would do nothing.
+    ///
+    /// When that is the situation, the existing hotkey is carried over instead
+    /// of lost — almost certainly what re-saving under the same name is for —
+    /// and the notice says so, so the carry-over itself is not a surprise
+    /// either. When the form *did* pick a hotkey, that pick wins, same as any
+    /// other field on the replacement.
+    /// </remarks>
+    public static (HotkeyBinding Hotkey, string? Notice) ResolveSaveHotkey(KeyMacro? existing, HotkeyBinding pending)
+    {
+        if (existing == null) return (pending, null);
+
+        if (!pending.IsValid && existing.Hotkey.IsValid)
+        {
+            return (existing.Hotkey,
+                $"\"{existing.Name}\" already existed — replaced it, and kept its {existing.Hotkey.Name} "
+                + "hotkey since this form's hotkey slot was empty.");
+        }
+
+        if (pending.IsValid && existing.Hotkey.IsValid && pending.Code != existing.Hotkey.Code)
+        {
+            return (pending,
+                $"\"{existing.Name}\" already existed — replaced it, including its hotkey "
+                + $"({existing.Hotkey.Name} to {pending.Name}).");
+        }
+
+        return (pending, $"\"{existing.Name}\" already existed — replaced it.");
+    }
+
+    /// <summary>The macro that owns this hotkey code, or null when none does.</summary>
+    /// <remarks>
+    /// Matched by code alone, disabled macros included — the same rule
+    /// <c>MainWindow.Macros.cs</c>'s own <c>HotkeyHolder</c> already applies
+    /// when checking one macro's pick against every other one. A disabled
+    /// macro's key still belongs to it; letting something else take it while
+    /// it is merely disabled would collide the moment it is re-enabled.
+    ///
+    /// This is what makes the fixed hotkeys' <c>Bind</c> and the macros'
+    /// <c>BindMacroHotkey</c> agree: both refuse a key a macro already owns,
+    /// instead of only one of them checking.
+    /// </remarks>
+    public static KeyMacro? FindByHotkeyCode(IEnumerable<KeyMacro> macros, int code, KeyMacro? excluding = null) =>
+        macros.FirstOrDefault(m => !ReferenceEquals(m, excluding) && m.Hotkey.IsValid && m.Hotkey.Code == code);
+
     /// <summary>
     /// Reads keys typed as "1, 2" or "R" into the running platform's own key
     /// codes.

@@ -855,10 +855,19 @@ public partial class MainWindow : Window
                 // One key, one action. Bound twice, only the first would ever
                 // run — which reads as a hotkey that quietly stopped working
                 // rather than as a clash, so it is refused by name instead.
+                //
+                // Checked against the macros' hotkeys too, not just the other
+                // four fixed ones: Fire()'s if/else-if chain tries these fixed
+                // hotkeys before it ever looks at a macro's, so a fixed key
+                // rebound onto a key a macro already owns would permanently
+                // shadow that macro — it would still look bound on its card
+                // and fire nothing. BindMacroHotkey already refuses the other
+                // direction; this is what makes the two agree.
                 string? taken = Bindings()
                     .Where(b => b.Code == code && b.Action != action)
                     .Select(b => b.Action)
-                    .FirstOrDefault();
+                    .FirstOrDefault()
+                    ?? MacroStore.FindByHotkeyCode(_macroList, code)?.Name;
 
                 if (taken != null)
                 {

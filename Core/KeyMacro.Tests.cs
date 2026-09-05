@@ -169,6 +169,126 @@ public class KeyMacroTests
         Assert.Equal(400, macros[1].IntervalMs);
     }
 
+    [Fact]
+    public void FindMatchesByNameCaseInsensitively()
+    {
+        var macros = new List<KeyMacro> { new("Spam R", new[] { 0x52 }, "R", 120) };
+
+        Assert.Same(macros[0], MacroStore.Find(macros, "spam r"));
+    }
+
+    [Fact]
+    public void FindReturnsNullWhenNoMacroHasThatName()
+    {
+        var macros = new List<KeyMacro> { new("Spam R", new[] { 0x52 }, "R", 120) };
+
+        Assert.Null(MacroStore.Find(macros, "Spam T"));
+    }
+
+    // ---- carrying a hotkey across a same-named save ----
+    //
+    // SaveMacro's own form defaults its pending hotkey to Unbound. Saving
+    // under a name that already exists must never let that default silently
+    // erase a working hotkey — see ResolveSaveHotkey's own remarks.
+
+    [Fact]
+    public void ResolveSaveHotkeyPassesThePendingPickThroughWhenNothingExistsUnderThatNameYet()
+    {
+        (HotkeyBinding hotkey, string? notice) =
+            MacroStore.ResolveSaveHotkey(existing: null, pending: HotkeyBinding.Unbound);
+
+        Assert.Equal(HotkeyBinding.Unbound, hotkey);
+        Assert.Null(notice);
+    }
+
+    [Fact]
+    public void ResolveSaveHotkeyCarriesOverTheExistingHotkeyWhenTheFormLeftItsSlotEmpty()
+    {
+        var existing = new KeyMacro("Spam", new[] { 0x52 }, "R", 120, hotkey: new HotkeyBinding(99, "F7"));
+
+        (HotkeyBinding hotkey, string? notice) =
+            MacroStore.ResolveSaveHotkey(existing, pending: HotkeyBinding.Unbound);
+
+        Assert.Equal(99, hotkey.Code);
+        Assert.Equal("F7", hotkey.Name);
+        Assert.Contains("F7", notice);
+        Assert.Contains("Spam", notice);
+    }
+
+    [Fact]
+    public void ResolveSaveHotkeyKeepsTheFormsOwnPickWhenItSetOne()
+    {
+        var existing = new KeyMacro("Spam", new[] { 0x52 }, "R", 120, hotkey: new HotkeyBinding(99, "F7"));
+        var pending = new HotkeyBinding(50, "F5");
+
+        (HotkeyBinding hotkey, string? notice) = MacroStore.ResolveSaveHotkey(existing, pending);
+
+        Assert.Equal(pending, hotkey);
+        Assert.Contains("F5", notice);
+    }
+
+    [Fact]
+    public void ResolveSaveHotkeyStillNoticesAPlainReplaceWithNoHotkeyInvolved()
+    {
+        var existing = new KeyMacro("Spam", new[] { 0x52 }, "R", 120);
+
+        (HotkeyBinding hotkey, string? notice) =
+            MacroStore.ResolveSaveHotkey(existing, pending: HotkeyBinding.Unbound);
+
+        Assert.Equal(HotkeyBinding.Unbound, hotkey);
+        Assert.NotNull(notice);
+        Assert.Contains("Spam", notice);
+    }
+
+    // ---- who owns a hotkey code ----
+    //
+    // Symmetric with the fixed hotkeys' own clash check: a macro's hotkey
+    // must be found the same way whichever direction is asking, or a fixed
+    // hotkey can be rebound onto a key a macro already owns and permanently
+    // shadow it (Fire() tries the fixed hotkeys first).
+
+    [Fact]
+    public void FindByHotkeyCodeReturnsTheMacroThatOwnsIt()
+    {
+        var macro = new KeyMacro("Spam", new[] { 0x52 }, "R", 120, hotkey: new HotkeyBinding(99, "F7"));
+        var macros = new List<KeyMacro> { macro };
+
+        Assert.Same(macro, MacroStore.FindByHotkeyCode(macros, 99));
+    }
+
+    [Fact]
+    public void FindByHotkeyCodeReturnsNullWhenNoMacroOwnsIt()
+    {
+        var macros = new List<KeyMacro> { new("Spam", new[] { 0x52 }, "R", 120, hotkey: new HotkeyBinding(99, "F7")) };
+
+        Assert.Null(MacroStore.FindByHotkeyCode(macros, 50));
+    }
+
+    [Fact]
+    public void FindByHotkeyCodeSkipsTheExcludedMacro()
+    {
+        var macro = new KeyMacro("Spam", new[] { 0x52 }, "R", 120, hotkey: new HotkeyBinding(99, "F7"));
+        var macros = new List<KeyMacro> { macro };
+
+        Assert.Null(MacroStore.FindByHotkeyCode(macros, 99, excluding: macro));
+    }
+
+    /// <summary>
+    /// A disabled macro still owns its key here — the same rule
+    /// <c>HotkeyHolder</c> in <c>MainWindow.Macros.cs</c> already applies.
+    /// Letting a disabled macro's key go to something else would collide the
+    /// moment it is re-enabled.
+    /// </summary>
+    [Fact]
+    public void FindByHotkeyCodeMatchesADisabledMacroToo()
+    {
+        var macro = new KeyMacro("Spam", new[] { 0x52 }, "R", 120,
+            hotkey: new HotkeyBinding(99, "F7"), enabled: false);
+        var macros = new List<KeyMacro> { macro };
+
+        Assert.Same(macro, MacroStore.FindByHotkeyCode(macros, 99));
+    }
+
     /// <summary>
     /// Nothing ships. An example macro reads as a feature of the app rather
     /// than something the user made, and the first instinct is to delete it.
