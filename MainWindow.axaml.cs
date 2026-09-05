@@ -220,6 +220,12 @@ public partial class MainWindow : Window
         HitFixToggle.IsCheckedChanged += (_, _) => Publish();
         SpinToggle.IsCheckedChanged += (_, _) => Publish();
 
+        // Content set from the one place that names these, so "Wheel" is not
+        // spelled here as well as in ClickButtons.Label.
+        ButtonLeft.Content = ClickButtons.Label(ClickButton.Left);
+        ButtonRight.Content = ClickButtons.Label(ClickButton.Right);
+        ButtonMiddle.Content = ClickButtons.Label(ClickButton.Middle);
+
         ButtonLeft.IsCheckedChanged += (_, _) => Publish();
         ButtonRight.IsCheckedChanged += (_, _) => Publish();
         ButtonMiddle.IsCheckedChanged += (_, _) => Publish();
