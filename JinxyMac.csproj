@@ -51,6 +51,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!--
+      The wallpaper a fresh install starts with. LogicalName pins the manifest
+      name so moving this file cannot silently break Wallpaper.InstallDefault,
+      which looks it up by string.
+    -->
+    <EmbeddedResource Include="Assets/DefaultWallpaper.png" LogicalName="DefaultWallpaper.png" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.3.0" />
     <PackageReference Include="Avalonia.Desktop" Version="11.3.0" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.0" />

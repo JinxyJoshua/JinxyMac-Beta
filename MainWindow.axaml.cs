@@ -975,6 +975,8 @@ public partial class MainWindow : Window
         OpacitySlider.Value = Math.Clamp(_settings.Opacity, OpacitySlider.Minimum, OpacitySlider.Maximum);
         SetOpacity(OpacitySlider.Value);
 
+        WallpaperDimmingSlider.Value = _settings.WallpaperDimming;
+
         try
         {
             SetAccent(Color.Parse(_settings.AccentColor));
@@ -988,6 +990,8 @@ public partial class MainWindow : Window
         RefreshReadouts();
 
         _loading = false;
+
+        ApplyWallpaper();
     }
 
     private void Persist()
@@ -2047,6 +2051,106 @@ public partial class MainWindow : Window
             UseCustomAccent();
             e.Handled = true;
         };
+
+        ChooseWallpaperButton.Click += async (_, _) => await ChooseWallpaperAsync();
+
+        ClearWallpaperButton.Click += (_, _) =>
+        {
+            Wallpaper.Clear();
+            _settings.WallpaperName = "";
+            ApplyWallpaper();
+            Persist();
+        };
+
+        WallpaperDimmingSlider.PropertyChanged += (_, e) =>
+        {
+            if (e.Property != RangeBase.ValueProperty) return;
+
+            _settings.WallpaperDimming = Wallpaper.ClampDimming((int)WallpaperDimmingSlider.Value);
+            ApplyWallpaper();
+
+            if (!_loading) Persist();
+        };
+    }
+
+    /// <summary>
+    /// What the file picker offers, built from the same list the store accepts.
+    /// </summary>
+    /// <remarks>
+    /// Lives here rather than beside <see cref="Wallpaper.Allowed"/> because
+    /// Core carries no Avalonia dependency — the test project compiles those
+    /// files without it. Derived from that array so a format cannot be added to
+    /// one and missed in the other.
+    /// </remarks>
+    private static FilePickerFileType ImageFileType => new("Images")
+    {
+        Patterns = Wallpaper.Allowed.Select(e => "*" + e).ToArray()
+    };
+
+    private async Task ChooseWallpaperAsync()
+    {
+        try
+        {
+            IReadOnlyList<IStorageFile> picked = await StorageProvider.OpenFilePickerAsync(
+                new FilePickerOpenOptions
+                {
+                    Title = "Choose a background",
+                    AllowMultiple = false,
+                    FileTypeFilter = new[] { ImageFileType }
+                });
+
+            string? path = picked.Count > 0 ? picked[0].TryGetLocalPath() : null;
+            if (path == null) return;
+
+            string? stored = Wallpaper.Store(path);
+            if (stored == null)
+            {
+                WallpaperStatusText.Text = "That file could not be read. Try a PNG or JPEG.";
+                return;
+            }
+
+            _settings.WallpaperName = stored;
+            ApplyWallpaper();
+            Persist();
+        }
+        catch
+        {
+            // A cancelled or failed pick leaves the previous background alone.
+        }
+    }
+
+    /// <summary>Paints the stored wallpaper, or nothing when there is not one.</summary>
+    private void ApplyWallpaper()
+    {
+        string? path = Wallpaper.Resolve(_settings.WallpaperName);
+
+        WallpaperImage.Source = null;
+
+        // Both layers move together. A dim border left visible with no picture
+        // behind it would tint the whole window for no reason.
+        if (path == null)
+        {
+            WallpaperStatusText.Text = "No picture set.";
+            WallpaperImage.IsVisible = false;
+            WallpaperDim.IsVisible = false;
+            return;
+        }
+
+        try
+        {
+            WallpaperImage.Source = new Bitmap(path);
+            WallpaperImage.IsVisible = true;
+            WallpaperDim.IsVisible = true;
+            WallpaperDim.Opacity = Wallpaper.DimmingOpacity(_settings.WallpaperDimming);
+            WallpaperStatusText.Text = $"Using {_settings.WallpaperName}.";
+        }
+        catch
+        {
+            // A file that will not decode is the same as not having one.
+            WallpaperImage.IsVisible = false;
+            WallpaperDim.IsVisible = false;
+            WallpaperStatusText.Text = "That picture could not be decoded, so it is not being shown.";
+        }
     }
 
     private void BuildSwatches()
