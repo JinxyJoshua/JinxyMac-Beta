@@ -18,6 +18,13 @@ public sealed class AppSettings
     public bool HitFix { get; set; } = true;
     public bool UltraAccuracy { get; set; }
 
+    /// <summary>Which button the clicker presses. Stored by name, not number.</summary>
+    /// <remarks>
+    /// A name so a settings file stays readable and a reordered enum cannot
+    /// silently change what someone's saved configuration does.
+    /// </remarks>
+    public string ClickButton { get; set; } = "Left";
+
     /// <summary>Hold the key to click, rather than pressing once to latch.</summary>
     public bool HoldMode { get; set; }
 

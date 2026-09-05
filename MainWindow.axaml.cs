@@ -220,6 +220,10 @@ public partial class MainWindow : Window
         HitFixToggle.IsCheckedChanged += (_, _) => Publish();
         SpinToggle.IsCheckedChanged += (_, _) => Publish();
 
+        ButtonLeft.IsCheckedChanged += (_, _) => Publish();
+        ButtonRight.IsCheckedChanged += (_, _) => Publish();
+        ButtonMiddle.IsCheckedChanged += (_, _) => Publish();
+
         StartStopButton.Click += (_, _) => Toggle();
 
         HoldModeButton.IsCheckedChanged += (_, _) => ModeChanged();
@@ -451,8 +455,10 @@ public partial class MainWindow : Window
         // with them — a floor on the press length is exactly the thing the fixed
         // rate is choosing for itself.
         _clicker.Apply(_building
-            ? new ClickSettings(Clicker.BuildCps, Clicker.BuildDuty, false, SpinToggle.IsChecked == true)
-            : new ClickSettings(cps, duty, hitFix, SpinToggle.IsChecked == true));
+            ? new ClickSettings(Clicker.BuildCps, Clicker.BuildDuty, false,
+                                SpinToggle.IsChecked == true, SelectedButton)
+            : new ClickSettings(cps, duty, hitFix,
+                                SpinToggle.IsChecked == true, SelectedButton));
 
         if (_building)
         {
@@ -482,6 +488,12 @@ public partial class MainWindow : Window
         if (!_loading) Persist();
     }
 
+    /// <summary>The button the selector is on.</summary>
+    private ClickButton SelectedButton =>
+        ButtonRight.IsChecked == true ? ClickButton.Right
+        : ButtonMiddle.IsChecked == true ? ClickButton.Middle
+        : ClickButton.Left;
+
     private void UpdateMeasured()
     {
         long clicks = _clicker.ClickCount;
@@ -496,6 +508,24 @@ public partial class MainWindow : Window
             MeasuredText.Text = _clicker.IsRunning
                 ? $"Measured {rate:0.0} /s"
                 : "Measured — /s";
+
+            // Classified from the same one-second delta the readout shows, so
+            // the sentence and the number can never disagree.
+            double setCps = _building ? Clicker.BuildCps : CpsSlider.Value;
+            double duty = Math.Clamp(DutySlider.Value / 100.0, 0, 1);
+
+            OutputState state = ClickOutput.Classify(
+                _clicker.IsRunning,
+                setCps,
+                rate,
+                hitFixClamping: !_building
+                                && ClickTimings.IsClamped(setCps, duty, HitFixToggle.IsChecked == true));
+
+            VerdictText.Text = ClickOutput.Verdict(state, setCps, rate);
+
+            VerdictText.Foreground = ClickOutput.IsWarning(state)
+                ? this.FindResource("Accent") as IBrush
+                : this.FindResource("TextMuted") as IBrush;
 
             RecordActivity(seconds, delivered);
         }
@@ -888,6 +918,12 @@ public partial class MainWindow : Window
         HitFixToggle.IsChecked = _settings.HitFix;
         SpinToggle.IsChecked = _settings.UltraAccuracy;
 
+        ClickButton restored = ClickButtons.Parse(_settings.ClickButton);
+
+        ButtonLeft.IsChecked = restored == ClickButton.Left;
+        ButtonRight.IsChecked = restored == ClickButton.Right;
+        ButtonMiddle.IsChecked = restored == ClickButton.Middle;
+
         ShakeLeftSlider.Value = _settings.ShakeLeft;
         ShakeRightSlider.Value = _settings.ShakeRight;
         ShakeUpSlider.Value = _settings.ShakeUp;
@@ -962,6 +998,7 @@ public partial class MainWindow : Window
         _settings.Cdc = DutySlider.Value;
         _settings.HitFix = HitFixToggle.IsChecked == true;
         _settings.UltraAccuracy = SpinToggle.IsChecked == true;
+        _settings.ClickButton = SelectedButton.ToString();
 
         _settings.Shake = ShakeToggle.IsChecked == true;
         _settings.ShakeLeft = ShakeLeftSlider.Value;

@@ -68,6 +68,14 @@ public static class PresetStore
     /// <summary>The list a fresh install starts from, and what Restore adds back.</summary>
     public static List<ClickPreset> Defaults() => new()
     {
+        // Measured, not chosen. Frame by frame off a match where this exact
+        // configuration landed 34 hits on a run that a 193 CPS setup landed 33
+        // — the whole point being that the slower one won. Hold mode and the
+        // duty cycle are as load-bearing as the rate, so it ships as all three.
+        //
+        // First in the list because it is the only entry here with a number
+        // behind it, and because the rates below are the ones that lose.
+        new ClickPreset("Measured", 41.2, 77.37, holdMode: true),
         new ClickPreset("Ish", 193.62, 73.52),
         new ClickPreset("Snoopy", 75.65, 91.21),
         new ClickPreset("Stunned", 72.92, 17.16),

@@ -18,9 +18,12 @@ namespace JinxyMac.Core.Tests;
 public class PresetsTests
 {
     [Fact]
-    public void ShipsElevenOfThem()
+    public void ShipsTwelveOfThem()
     {
-        Assert.Equal(11, PresetStore.Defaults().Count);
+        // Was eleven; the Measured preset added a twelfth. Existing users only
+        // see it after Restore, because PresetStore persists the whole list and
+        // deleted defaults are meant to stay deleted.
+        Assert.Equal(12, PresetStore.Defaults().Count);
     }
 
     [Fact]
@@ -50,10 +53,18 @@ public class PresetsTests
         Assert.Equal(64.25, preset.Cdc);
     }
 
+    /// <summary>
+    /// True of every default except Measured, whose hold mode is part of the
+    /// configuration it was measured from, not an oversight.
+    /// </summary>
     [Fact]
-    public void DefaultsAreToggleRatherThanHold()
+    public void DefaultsAreToggleRatherThanHoldExceptMeasured()
     {
-        Assert.All(PresetStore.Defaults(), p => Assert.Equal("Toggle", p.ModeText));
+        Assert.All(
+            PresetStore.Defaults().Where(p => p.Name != "Measured"),
+            p => Assert.Equal("Toggle", p.ModeText));
+
+        Assert.Equal("Hold", PresetStore.Defaults().Single(p => p.Name == "Measured").ModeText);
     }
 
     // ---- the bar ----
