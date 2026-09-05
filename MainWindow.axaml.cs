@@ -179,8 +179,12 @@ public partial class MainWindow : Window
         // shipped defaults are already in force, and nothing waits on this.
         _ = LoadRemoteConfig();
 
-        // Quietly, and only if asked for. Nothing is downloaded without a press.
-        if (_settings.AutoCheckUpdates) _ = CheckForUpdate(announce: false);
+        // Quietly, and only if asked for. Nothing is downloaded without a
+        // press. OfferUpdateAtLaunch (MainWindow.UpdateOffer.cs) runs this
+        // same check and, if it finds something, raises the offer window —
+        // CheckForUpdate itself is unchanged and still lights up the
+        // Settings page's own UpdateBox exactly as it always has.
+        if (_settings.AutoCheckUpdates) _ = OfferUpdateAtLaunch();
 
         _stats = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _stats.Tick += (_, _) => UpdateMeasured();
@@ -210,17 +214,21 @@ public partial class MainWindow : Window
 
             _recorder.Dispose();
             _replay.Dispose();
+
+            // Before _macros.Dispose(): Dispose calls StopAll, which raises
+            // Changed for any macro still running at shutdown, and the
+            // subscription in WireMacroBadge posts a RefreshMacroBadge
+            // continuation to the UI thread in response. Unsubscribing (and
+            // closing the badge, which is the other half of the same
+            // teardown — see UnwireMacroBadge) first means that
+            // continuation is never queued in the first place, rather than
+            // relying on it landing after Close() and being a no-op there.
+            UnwireMacroBadge();
+
             _macros.Dispose();
             _clicker.Dispose();
             _shaker.Dispose();
             _hotkeys.Dispose();
-
-            // Closed explicitly rather than left to fall with the process:
-            // ShutdownMode is OnMainWindowClose, so it would go regardless,
-            // but that leaves a topmost, undecorated window flash closed
-            // rather than disappearing with the rest of the app.
-            _macroBadgeTicker.Stop();
-            _macroBadge?.Close();
         };
 
         _hotkeys.Start();
@@ -2658,28 +2666,22 @@ public partial class MainWindow : Window
         UpdateProgress.IsVisible = true;
         UpdateProgress.Value = 0;
 
-        var progress = new Progress<double>(fraction =>
-            UpdateProgress.Value = Math.Clamp(fraction, 0, 1));
+        // RunInstall (MainWindow.UpdateOffer.cs) is the one place that
+        // calls Updater.InstallAsync and decides what happens next — shared
+        // with UpdateOfferWindow so the manual and launch-time paths cannot
+        // install differently.
+        await RunInstall(
+            update,
+            onHeadline: text => UpdateHeadlineText.Text = text,
+            onProgress: fraction => UpdateProgress.Value = fraction,
+            onFailure: failure =>
+            {
+                UpdateProgress.IsVisible = false;
+                UpdateHeadlineText.Text = failure;
 
-        UpdateHeadlineText.Text = $"Downloading {update.Version}…";
-
-        string? failure = await Updater.InstallAsync(update, progress);
-
-        if (failure == null)
-        {
-            // The swap script is waiting for this process to go away before it
-            // touches the bundle, so closing is the last step of the install
-            // rather than a courtesy.
-            UpdateHeadlineText.Text = "Installing. Jinxy will reopen by itself.";
-            Close();
-            return;
-        }
-
-        UpdateProgress.IsVisible = false;
-        UpdateHeadlineText.Text = failure;
-
-        InstallUpdateButton.IsEnabled = true;
-        CheckUpdateButton.IsEnabled = true;
+                InstallUpdateButton.IsEnabled = true;
+                CheckUpdateButton.IsEnabled = true;
+            });
     }
     // ---- Roblox cache ----
 

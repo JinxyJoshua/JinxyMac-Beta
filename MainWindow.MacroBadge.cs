@@ -39,6 +39,17 @@ public partial class MainWindow
     /// </summary>
     private readonly DispatcherTimer _macroBadgeTicker = new() { Interval = TimeSpan.FromMilliseconds(500) };
 
+    /// <summary>
+    /// The <see cref="MacroRunner.Changed"/> subscription, kept so <see
+    /// cref="MainWindow.axaml.cs"/>'s <c>Closed</c> handler can remove it.
+    /// A held-open event on a runner that outlives this window would be a
+    /// leak with no window left to leak into; here it is not a memory
+    /// leak — <c>_macros</c> is disposed in the same handler — but the
+    /// closure still runs, and the fix belongs beside the subscription it
+    /// undoes rather than duplicated at the call site.
+    /// </summary>
+    private Action? _macroBadgeSubscription;
+
     private void WireMacroBadge()
     {
         _macroBadgeTicker.Tick += (_, _) => RefreshMacroBadge();
@@ -48,7 +59,28 @@ public partial class MainWindow
         // posts to the UI thread rather than touching the badge (or
         // _macroBadgeTicker, a DispatcherTimer, which is itself not
         // thread-safe to start/stop off its owning thread) directly.
-        _macros.Changed += () => Dispatcher.UIThread.Post(RefreshMacroBadge);
+        _macroBadgeSubscription = () => Dispatcher.UIThread.Post(RefreshMacroBadge);
+        _macros.Changed += _macroBadgeSubscription;
+    }
+
+    /// <summary>
+    /// Undoes <see cref="WireMacroBadge"/>'s subscription and closes the
+    /// badge, in that order — see the <c>Closed</c> handler in
+    /// <c>MainWindow.axaml.cs</c> for why the order relative to disposing
+    /// <c>_macros</c> matters.
+    /// </summary>
+    /// <remarks>
+    /// The badge is closed explicitly here rather than left to fall with
+    /// the process: ShutdownMode is OnMainWindowClose, so it would go
+    /// regardless, but that leaves a topmost, undecorated window flash
+    /// closed rather than disappearing with the rest of the app.
+    /// </remarks>
+    private void UnwireMacroBadge()
+    {
+        if (_macroBadgeSubscription is { } subscription) _macros.Changed -= subscription;
+
+        _macroBadgeTicker.Stop();
+        _macroBadge?.Close();
     }
 
     /// <summary>
