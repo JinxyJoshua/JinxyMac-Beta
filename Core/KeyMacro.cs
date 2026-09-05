@@ -360,7 +360,23 @@ public sealed class MacroRunner : IDisposable
             // release ran. Matches what Clicker.Loop does for the mouse
             // button, and for the same reason: a key left down in a game is
             // the keyboard equivalent of a button stuck across the desktop.
-            if (held is int stuck) Gated(() => _engine.KeyUp(stuck));
+            //
+            // This release only runs because a send already threw, and the
+            // usual reason — Accessibility permission revoked mid-run — is
+            // still true here, so the release is likely to throw the same
+            // way. Guarded because that second throw has nowhere left to go
+            // but out of this background thread, which kills the process —
+            // exactly what the catch above exists to prevent.
+            if (held is int stuck)
+            {
+                try { Gated(() => _engine.KeyUp(stuck)); }
+                catch
+                {
+                    // See above: the release can fail for the same reason
+                    // the send did, and must not be allowed to take the
+                    // process down with it.
+                }
+            }
         }
     }
 
