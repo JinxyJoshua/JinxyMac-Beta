@@ -229,10 +229,10 @@ public partial class MainWindow : Window
         Wire(NavMacros, PageMacros, "Macros", "Spam a key, or cycle a few");
         Wire(NavSwitcher, PageSwitcher, "Auto Switcher", "Swap between two hotbar slots");
         Wire(NavRecorder, PageRecorder, "Recorder", "Screen capture, hardware encoded");
+        Wire(NavKitWheel, PageKitWheel, "Kit Wheel", "Roll a kit you have not played yet");
         Wire(NavHistory, PageHistory, "History", "Time spent clicking, and how much of it landed");
         Wire(NavTheme, PageTheme, "Theme", "Accent colour");
         Wire(NavSettings, PageSettings, "Settings", "Where things are stored, and what this build can do");
-        Wire(NavKitWheel, PageKitWheel, "Kit Wheel", "Roll a kit you have not played yet");
 
         void Wire(RadioButton button, Control page, string title, string subtitle) =>
             button.IsCheckedChanged += (_, _) =>
@@ -3136,7 +3136,13 @@ public partial class MainWindow : Window
             catch { /* nothing there, or held open */ }
         }
 
-        var fresh = new AppSettings();
+        // Stamped explicitly, the same way Load()'s missing-file and
+        // corrupt-file paths do: a freshly constructed AppSettings defaults
+        // SchemaVersion to 0, and this object is about to be reflection-copied
+        // wholesale onto _settings. Leaving it at 0 would write a settings
+        // file that looks pre-migration — so the next launch would "migrate"
+        // a hotkey bound to A (HotkeyCode 0) straight back to unbound (-1).
+        var fresh = new AppSettings { SchemaVersion = AppSettings.CurrentSchema };
 
         foreach (System.Reflection.PropertyInfo property in typeof(AppSettings).GetProperties())
         {

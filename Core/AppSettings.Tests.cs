@@ -159,6 +159,61 @@ public class AppSettingsTests
     }
 
     /// <summary>
+    /// Reproduces the ResetEverything() bug in MainWindow.axaml.cs (~line
+    /// 3139) directly at the AppSettings level: "reset settings" reflection-
+    /// copies every readable/writable property from a freshly constructed
+    /// AppSettings onto the live settings, including SchemaVersion. A plain
+    /// <c>new AppSettings()</c> defaults that to 0, so a reset would drop the
+    /// live settings from CurrentSchema back to 0 — and the very next load
+    /// would see a stored 0 and "migrate" a hotkey the user bound to A right
+    /// after the reset (HotkeyCode 0) straight back to -1, unbinding it even
+    /// though HotkeyName still reads "A".
+    ///
+    /// This cannot drive the bug through a real MainWindow: the test project
+    /// links files in by source (see Testing/JinxyMac.Tests.csproj) and does
+    /// not compile MainWindow.axaml.cs, and even if it did, MainWindow's
+    /// constructor starts a native hotkey-polling thread and fires a real
+    /// network request — not something a deterministic unit test should do.
+    /// So this drives the identical operation — the same reflection copy,
+    /// over the same class — that both the bug and the fix live in. The
+    /// local copy below is written to mirror MainWindow.axaml.cs exactly;
+    /// keep the two in sync if that loop ever changes.
+    /// </summary>
+    [Fact]
+    public void ResettingThenBindingAThenReloadingKeepsTheBindingBound()
+    {
+        WithSettingsFile(
+            $$"""{"SchemaVersion":{{AppSettings.CurrentSchema}},"HotkeyCode":15,"HotkeyName":"R"}""",
+            () =>
+            {
+                AppSettings settings = AppSettings.Load();
+
+                // The exact reflection copy ResetEverything() runs, from a
+                // fresh AppSettings onto the live settings.
+                var fresh = new AppSettings { SchemaVersion = AppSettings.CurrentSchema };
+
+                foreach (System.Reflection.PropertyInfo property in typeof(AppSettings).GetProperties())
+                {
+                    if (property.CanRead && property.CanWrite)
+                        property.SetValue(settings, property.GetValue(fresh));
+                }
+
+                settings.Save();
+
+                // The user then binds the start/stop hotkey to A.
+                settings.HotkeyCode = 0;
+                settings.HotkeyName = "A";
+                settings.Save();
+
+                // Next launch.
+                AppSettings reloaded = AppSettings.Load();
+
+                Assert.Equal(0, reloaded.HotkeyCode);
+                Assert.True(new HotkeyBinding(reloaded.HotkeyCode, reloaded.HotkeyName).IsValid);
+            });
+    }
+
+    /// <summary>
     /// The catch path (a corrupt or unreadable settings file) must stamp
     /// CurrentSchema exactly like the missing-file path does. Without that,
     /// a hotkey bound against those defaults — including A, HotkeyCode 0 —
