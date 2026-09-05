@@ -1,0 +1,252 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Xunit;
+
+namespace JinxyMac.Core.Tests;
+
+/// <summary>
+/// Macros, and the parsing that turns what someone typed into one.
+/// </summary>
+/// <remarks>
+/// The sending itself is a SendInput call and cannot be tested without a
+/// desktop to send into. Everything deciding *what* gets sent is arithmetic and
+/// text, and that is where a macro goes wrong — a bad interval that pins a core,
+/// or a key list that silently parses to nothing.
+/// </remarks>
+public class KeyMacroTests
+{
+    [Fact]
+    public void KeepsTheKeysInTheOrderGiven()
+    {
+        var macro = new KeyMacro("Switcher", new[] { 0x31, 0x32 }, "1, 2", 500);
+
+        Assert.Equal(new[] { 0x31, 0x32 }, macro.Keys);
+    }
+
+    /// <summary>
+    /// A zero interval is a key that never comes up and a core pinned sending
+    /// it. The clamp is what stops a typo becoming a hang.
+    /// </summary>
+    [Theory]
+    [InlineData(0, KeyMacro.MinIntervalMs)]
+    [InlineData(-50, KeyMacro.MinIntervalMs)]
+    [InlineData(999999, KeyMacro.MaxIntervalMs)]
+    [InlineData(250, 250)]
+    public void ClampsTheInterval(int given, int expected)
+    {
+        Assert.Equal(expected, new KeyMacro("M", new[] { 0x52 }, "R", given).IntervalMs);
+    }
+
+    [Fact]
+    public void DropsKeyCodesOutsideTheValidRange()
+    {
+        var macro = new KeyMacro("M", new[] { 0, 0x52, 300, -1 }, "R", 100);
+
+        Assert.Equal(new[] { 0x52 }, macro.Keys);
+    }
+
+    [Fact]
+    public void IsNotUsableWithoutKeysOrAName()
+    {
+        Assert.False(new KeyMacro("M", Array.Empty<int>(), "", 100).IsUsable);
+        Assert.False(new KeyMacro("   ", new[] { 0x52 }, "R", 100).IsUsable);
+        Assert.True(new KeyMacro("M", new[] { 0x52 }, "R", 100).IsUsable);
+    }
+
+    [Fact]
+    public void SaysWhenItCycles()
+    {
+        Assert.Contains("cycles", new KeyMacro("S", new[] { 0x31, 0x32 }, "1, 2", 500).SummaryText);
+        Assert.DoesNotContain("cycles", new KeyMacro("R", new[] { 0x52 }, "R", 120).SummaryText);
+    }
+
+    [Theory]
+    [InlineData(120, "every 120 ms")]
+    [InlineData(1000, "every 1s")]
+    [InlineData(1500, "every 1.5s")]
+    public void ReadsTheRateAtAHumanScale(int interval, string expected)
+    {
+        Assert.Equal(expected, new KeyMacro("M", new[] { 0x52 }, "R", interval).RateText);
+    }
+
+    // ---- parsing what the user typed ----
+
+    [Fact]
+    public void ReadsASingleKey()
+    {
+        (int[] keys, string text) = MacroStore.ParseKeys("R")!.Value;
+
+        Assert.Equal(new[] { (int)'R' }, keys);
+        Assert.Equal("R", text);
+    }
+
+    /// <summary>Both separators, because people type both.</summary>
+    [Theory]
+    [InlineData("1, 2")]
+    [InlineData("1 2")]
+    [InlineData("1,2")]
+    public void ReadsACycleHoweverItIsSeparated(string typed)
+    {
+        (int[] keys, _) = MacroStore.ParseKeys(typed)!.Value;
+
+        Assert.Equal(new[] { (int)'1', (int)'2' }, keys);
+    }
+
+    [Fact]
+    public void UppercasesSoTheCodesAreConsistent()
+    {
+        (int[] lower, _) = MacroStore.ParseKeys("r")!.Value;
+        (int[] upper, _) = MacroStore.ParseKeys("R")!.Value;
+
+        Assert.Equal(upper, lower);
+    }
+
+    /// <summary>
+    /// Refused rather than silently dropped. A macro that parsed "Shift" to
+    /// nothing would save, sit in the list, and do nothing at all.
+    /// </summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(null)]
+    [InlineData("Shift")]
+    [InlineData("F5")]
+    [InlineData("1, Shift")]
+    [InlineData("!")]
+    public void RefusesWhatItCannotSend(string? typed)
+    {
+        Assert.Null(MacroStore.ParseKeys(typed));
+    }
+
+    [Theory]
+    [InlineData("100", 100)]
+    [InlineData(" 250 ", 250)]
+    public void ReadsAnInterval(string typed, int expected)
+    {
+        Assert.Equal(expected, MacroStore.ParseInterval(typed));
+    }
+
+    [Theory]
+    [InlineData("4")]
+    [InlineData("99999")]
+    [InlineData("fast")]
+    [InlineData("")]
+    public void RefusesAnIntervalOutsideTheRange(string typed)
+    {
+        Assert.Null(MacroStore.ParseInterval(typed));
+    }
+
+    // ---- the list ----
+
+    [Fact]
+    public void UpsertReplacesByNameRatherThanAdding()
+    {
+        var macros = new List<KeyMacro> { new("Spam R", new[] { 0x52 }, "R", 120) };
+
+        MacroStore.Upsert(macros, new KeyMacro("spam r", new[] { 0x54 }, "T", 300));
+
+        KeyMacro only = Assert.Single(macros);
+        Assert.Equal(300, only.IntervalMs);
+    }
+
+    [Fact]
+    public void UpsertKeepsThePositionOfWhatItReplaces()
+    {
+        var macros = new List<KeyMacro>
+        {
+            new("One", new[] { 0x31 }, "1", 100),
+            new("Two", new[] { 0x32 }, "2", 100),
+            new("Three", new[] { 0x33 }, "3", 100)
+        };
+
+        MacroStore.Upsert(macros, new KeyMacro("Two", new[] { 0x39 }, "9", 400));
+
+        Assert.Equal("Two", macros[1].Name);
+        Assert.Equal(400, macros[1].IntervalMs);
+    }
+
+    /// <summary>
+    /// Nothing ships. An example macro reads as a feature of the app rather
+    /// than something the user made, and the first instinct is to delete it.
+    /// </summary>
+    [Fact]
+    public void ShipsWithNoMacrosAtAll()
+    {
+        Assert.Empty(MacroStore.Defaults());
+    }
+
+    /// <summary>
+    /// The switcher lived in this list before it became its own page. Anyone
+    /// who ran that build has it saved, and without this it appears on both
+    /// pages at once.
+    /// </summary>
+    [Fact]
+    public void DoesNotOfferTheSwitcherAsAMacro()
+    {
+        Assert.DoesNotContain(MacroStore.Defaults(),
+            m => m.Name.Contains("Switcher", StringComparison.OrdinalIgnoreCase));
+    }
+
+    // ---- the platform guard ----
+    //
+    // MacroStore.Load() reads a fixed path (SettingsPath.For("macros.json")),
+    // so these write to that real file directly, the same way
+    // Wallpaper.Tests.cs exercises Store/Clear against the real settings
+    // folder — and restore whatever was there before in a finally block.
+
+    private static string MacrosFilePath => SettingsPath.For("macros.json");
+
+    [Fact]
+    public void AMacosFileLoadsItsMacros()
+    {
+        WithMacrosFile("""{"platform":"macos","macros":[{"Name":"Spam R","Keys":[82],"KeysText":"R","IntervalMs":120}]}""", () =>
+        {
+            KeyMacro only = Assert.Single(MacroStore.Load());
+            Assert.Equal("Spam R", only.Name);
+        });
+    }
+
+    /// <summary>
+    /// A file written by the Windows build uses the same 0-255 key filter to
+    /// mean virtual-key codes, not CGKeyCodes. Loading it here would press
+    /// entirely different keys, so it loads as no macros rather than as an
+    /// error or a partial load.
+    /// </summary>
+    [Fact]
+    public void AWindowsFileLoadsEmpty()
+    {
+        WithMacrosFile("""{"platform":"windows","macros":[{"Name":"Spam R","Keys":[82],"KeysText":"R","IntervalMs":120}]}""", () =>
+        {
+            Assert.Empty(MacroStore.Load());
+        });
+    }
+
+    /// <summary>A file with no platform member is exactly as foreign as one from Windows.</summary>
+    [Fact]
+    public void AFileWithNoPlatformMemberLoadsEmpty()
+    {
+        WithMacrosFile("""{"macros":[{"Name":"Spam R","Keys":[82],"KeysText":"R","IntervalMs":120}]}""", () =>
+        {
+            Assert.Empty(MacroStore.Load());
+        });
+    }
+
+    private static void WithMacrosFile(string json, Action assertion)
+    {
+        string path = MacrosFilePath;
+        bool existed = File.Exists(path);
+        string? original = existed ? File.ReadAllText(path) : null;
+
+        try
+        {
+            File.WriteAllText(path, json);
+            assertion();
+        }
+        finally
+        {
+            if (existed) File.WriteAllText(path, original!);
+            else if (File.Exists(path)) File.Delete(path);
+        }
+    }
+}
