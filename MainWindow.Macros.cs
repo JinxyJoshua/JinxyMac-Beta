@@ -42,16 +42,6 @@ public partial class MainWindow
 
     private bool _macrosBuilt;
 
-    /// <summary>
-    /// A can't be bound on this build — see <see cref="HotkeyBinding.Unbound"/>
-    /// for why its own code doubles as "no key at all" on macOS. Shared by
-    /// both places that can hit it: a typed KEY box (<see cref="SaveMacro"/>)
-    /// and a captured toggle hotkey (<see cref="BindMacroHotkey"/>).
-    /// </summary>
-    private const string UnbindableAMessage =
-        "A can't be bound on this build. Its key code doubles as this platform's \"no key\" marker, "
-        + "so the app can't tell a bound A from none at all — pick a different letter.";
-
     private void WireMacros()
     {
         MacrosHotkeyKill.Click += (_, _) =>
@@ -198,7 +188,7 @@ public partial class MainWindow
             if (code == 0)
             {
                 button.Content = previous;
-                ShowMacroHotkeyNotice(UnbindableAMessage);
+                ShowMacroHotkeyNotice(MacroStore.UnbindableAMessage);
                 return;
             }
 
@@ -299,10 +289,6 @@ public partial class MainWindow
         ArmHotkeys();
     }
 
-    private static bool MentionsUnbindableA(string typed) =>
-        typed.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries)
-            .Any(piece => piece.Trim().Equals("A", StringComparison.OrdinalIgnoreCase));
-
     private void SaveMacro()
     {
         MacroErrorText.IsVisible = false;
@@ -327,8 +313,8 @@ public partial class MainWindow
 
         if (keys == null)
         {
-            ShowMacroNotice(MentionsUnbindableA(typed)
-                ? UnbindableAMessage
+            ShowMacroNotice(MacroStore.MentionsUnbindableA(typed)
+                ? MacroStore.UnbindableAMessage
                 : "Each key box takes one letter or digit — R, or 1, or Q.");
             return;
         }
@@ -391,7 +377,11 @@ public partial class MainWindow
 
     private void RefreshMacroRunning()
     {
-        int count = _macros.RunningCount;
+        // RunningCount counts the switcher too — it is a KeyMacro under the
+        // reserved SwitcherMacro.Name (see its remarks) — but this page has no
+        // card for it and no way to have started it, so a switcher left on
+        // must not read as "1 macro running" here.
+        int count = _macros.RunningCount - (_macros.IsRunning(SwitcherMacro.Name) ? 1 : 0);
 
         MacroRunningText.Text = count switch
         {

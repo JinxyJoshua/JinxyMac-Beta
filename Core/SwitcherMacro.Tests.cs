@@ -43,6 +43,23 @@ public class SwitcherMacroTests
         Assert.NotNull(result.Error);
     }
 
+    /// <summary>
+    /// A is one letter, same as any other — "Both slots need one letter or
+    /// digit" would be untrue of it specifically. Whichever slot names A gets
+    /// MacroStore's own explanation instead, the same one the Macros page
+    /// gives for a typed A.
+    /// </summary>
+    [Theory]
+    [InlineData("A", "1")]
+    [InlineData("3", "a")]
+    public void NamingTheASlotExplainsWhyRatherThanBlamingTheFormat(string slotA, string slotB)
+    {
+        SwitcherMacro.Result result = SwitcherMacro.Build(slotA, slotB, 150, 900, 60, 100);
+
+        Assert.Null(result.Macro);
+        Assert.Equal(MacroStore.UnbindableAMessage, result.Error);
+    }
+
     [Theory]
     [InlineData(0, 900)]
     [InlineData(150, 0)]

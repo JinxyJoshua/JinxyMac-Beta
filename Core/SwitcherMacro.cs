@@ -80,6 +80,13 @@ public static class SwitcherMacro
     public static Result Build(
         string slotA, string slotB, int holdFirstMs, int holdSecondMs, int equipMs, double clickPeriodMs)
     {
+        // Checked before ParseKeys, not after: A parses as a real one-letter
+        // key like any other, so a length check alone would blame "not one
+        // letter or digit" for a slot that plainly is — see
+        // MacroStore.UnbindableAMessage for why A specifically can't be used.
+        if (MacroStore.MentionsUnbindableA(slotA) || MacroStore.MentionsUnbindableA(slotB))
+            return Result.Failed(MacroStore.UnbindableAMessage);
+
         (int[] Keys, string Text)? keys =
             MacroStore.ParseKeys((slotA ?? "").Trim() + "," + (slotB ?? "").Trim());
 

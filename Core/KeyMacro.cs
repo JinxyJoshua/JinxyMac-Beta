@@ -188,7 +188,7 @@ public sealed class MacroRunner : IDisposable
 {
     private readonly IKeyEngine _engine;
 
-    private readonly Dictionary<string, CancellationTokenSource> _running = new();
+    private readonly Dictionary<string, (CancellationTokenSource Cts, KeyMacro Macro)> _running = new();
 
     private long _sent;
 
@@ -197,6 +197,22 @@ public sealed class MacroRunner : IDisposable
     public bool IsRunning(string name) => _running.ContainsKey(name);
 
     public int RunningCount => _running.Count;
+
+    /// <summary>
+    /// Every key code any currently running macro might send.
+    /// </summary>
+    /// <remarks>
+    /// Exists so a hotkey watcher can tell its own macro's output apart from a
+    /// person's keypress. On macOS the watcher reads key state off the same
+    /// HID source this app's own synthetic presses go through (see
+    /// <c>MacHotkeyWatcher.Poll</c>'s remarks), so a macro that types the same
+    /// key a fixed hotkey is bound to — the switcher cycling 1 and 2 while a
+    /// clicker hotkey is bound to 1, say — would otherwise retrigger that
+    /// hotkey on every cycle. A stopped or disabled macro contributes nothing
+    /// here: gone from <c>_running</c> means gone from this, the same rule
+    /// a macro's own toggle hotkey already follows once it stops.
+    /// </remarks>
+    public IEnumerable<int> RunningKeys() => _running.Values.SelectMany(e => e.Macro.Keys);
 
     /// <summary>How many key presses have actually gone out.</summary>
     /// <remarks>
@@ -217,6 +233,13 @@ public sealed class MacroRunner : IDisposable
     ///
     /// Called on the macro thread, so whatever is behind it must be safe to
     /// call from anywhere.
+    ///
+    /// Currently unassigned in this build: nothing sets this property, so it
+    /// always reads null and every macro sends unconditionally regardless of
+    /// what is focused. The Windows original wires it to a foreground-window
+    /// check; wiring the same thing here needs a macOS frontmost-window check,
+    /// which this port has not added. Do not assume a macro is suppressed
+    /// while some other window has focus until something sets this.
     /// </remarks>
     public Func<bool>? Suppressed { get; set; }
 
@@ -262,7 +285,7 @@ public sealed class MacroRunner : IDisposable
         if (!macro.Enabled || !macro.IsUsable || _running.ContainsKey(macro.Name)) return;
 
         var cts = new CancellationTokenSource();
-        _running[macro.Name] = cts;
+        _running[macro.Name] = (cts, macro);
 
         CancellationToken token = cts.Token;
 
@@ -296,9 +319,9 @@ public sealed class MacroRunner : IDisposable
 
     public void Stop(string name)
     {
-        if (!_running.TryGetValue(name, out CancellationTokenSource? cts)) return;
+        if (!_running.TryGetValue(name, out (CancellationTokenSource Cts, KeyMacro Macro) entry)) return;
 
-        cts.Cancel();
+        entry.Cts.Cancel();
         _running.Remove(name);
 
         Changed?.Invoke();
@@ -308,7 +331,7 @@ public sealed class MacroRunner : IDisposable
     {
         if (_running.Count == 0) return;
 
-        foreach (CancellationTokenSource cts in _running.Values) cts.Cancel();
+        foreach (var entry in _running.Values) entry.Cts.Cancel();
 
         _running.Clear();
 
@@ -765,6 +788,27 @@ public static class MacroStore
     /// </remarks>
     public static KeyMacro? FindByHotkeyCode(IEnumerable<KeyMacro> macros, int code, KeyMacro? excluding = null) =>
         macros.FirstOrDefault(m => !ReferenceEquals(m, excluding) && m.Hotkey.IsValid && m.Hotkey.Code == code);
+
+    /// <summary>
+    /// A can't be bound on this build — see <see cref="HotkeyBinding.Unbound"/>
+    /// for why its own code doubles as "no key at all" on macOS. Shared by
+    /// every place that can hit it: a typed KEY box on the Macros page, a
+    /// captured toggle hotkey, a fixed hotkey, and a switcher slot.
+    /// </summary>
+    public const string UnbindableAMessage =
+        "A can't be bound on this build. Its key code doubles as this platform's \"no key\" marker, "
+        + "so the app can't tell a bound A from none at all — pick a different letter.";
+
+    /// <summary>Whether any comma/space-separated piece of typed text is the letter A.</summary>
+    /// <remarks>
+    /// Lets a caller tell "nothing usable was typed" apart from "the one
+    /// unbindable letter was typed", so it can show <see cref="UnbindableAMessage"/>
+    /// instead of a generic validation error that would be untrue of A
+    /// specifically.
+    /// </remarks>
+    public static bool MentionsUnbindableA(string? typed) =>
+        (typed ?? "").Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries)
+            .Any(piece => piece.Trim().Equals("A", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// Reads keys typed as "1, 2" or "R" into the running platform's own key

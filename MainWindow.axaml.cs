@@ -833,10 +833,20 @@ public partial class MainWindow : Window
     /// does the top one rather than both. Nothing prevents that binding — it is
     /// the user's key and they may have meant it — but doing two things at once
     /// would not be what anyone meant.
+    ///
+    /// A key any running macro is currently sending is refused before any of
+    /// that: on macOS the watcher reads key state off the same HID source
+    /// this app's own synthetic presses go through (see
+    /// <c>MacHotkeyWatcher.Poll</c>'s remarks), so without this a macro
+    /// cycling through a hotkey's own code — the switcher alternating 1 and 2
+    /// while a clicker hotkey sits on 1, say — would retrigger that hotkey on
+    /// every cycle. The switcher is a <see cref="KeyMacro"/> too, so this
+    /// covers it the same way.
     /// </remarks>
     private void Fire(int code)
     {
         if (code == 0) return;
+        if (_macros.RunningKeys().Contains(code)) return;
 
         if (code == _settings.HotkeyCode)
         {
@@ -900,6 +910,22 @@ public partial class MainWindow : Window
             _hotkeys.CaptureNext((code, name) => Dispatcher.UIThread.Post(() =>
             {
                 _rebinding = false;
+
+                // Code 0 is both "not set" and, on macOS, the A key's real code
+                // (see HotkeyBinding.Unbound) — so a press of A here has to be
+                // refused with an explanation, the same one BindMacroHotkey
+                // gives, rather than stored as a hotkey that looks bound ("A")
+                // but can never fire: MacHotkeyWatcher.Bindable(0) is false, so
+                // ArmHotkeys never actually watches it, and Fire() returns
+                // early on code 0 anyway — a dead hotkey that displays as set.
+                if (code == 0)
+                {
+                    button.Content = previous;
+
+                    HotkeyNoticeText.Text = MacroStore.UnbindableAMessage;
+                    HotkeyNoticeText.IsVisible = true;
+                    return;
+                }
 
                 // One key, one action. Bound twice, only the first would ever
                 // run — which reads as a hotkey that quietly stopped working

@@ -220,7 +220,7 @@ public partial class MainWindow
                 ? $" Raised from {holdFirst.Value} to {result.FirstHoldMs} ms: any shorter draws the "
                   + "weapon and swaps away before it fires."
                 : "")
-            + " Nothing is sent while this window is in front, so switch to the game.";
+            + " It goes to whatever window is focused, so switch to the game now.";
 
         RefreshSwitcherCard();
     }

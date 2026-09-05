@@ -240,4 +240,55 @@ public class MacroRunnerTests
 
         Assert.Null(held);
     }
+
+    /// <summary>
+    /// The collision guard <c>MainWindow.axaml.cs</c>'s <c>Fire</c> needs:
+    /// a running macro's own output must be discoverable, so a hotkey watcher
+    /// that observes this app's own synthetic key events (as
+    /// <c>MacHotkeyWatcher.Poll</c> does on macOS) can tell them apart from a
+    /// person's keypress.
+    /// </summary>
+    [Fact]
+    public void RunningKeysReportsARunningMacrosOutput()
+    {
+        var engine = new FakeKeyEngine();
+        using var runner = new MacroRunner(engine);
+
+        var macro = new KeyMacro("Switcher", new[] { 0x31, 0x32 }, "1, 2", 25);
+        runner.Start(macro);
+
+        Assert.Contains(0x31, runner.RunningKeys());
+        Assert.Contains(0x32, runner.RunningKeys());
+
+        runner.Stop("Switcher");
+        Thread.Sleep(100);
+    }
+
+    [Fact]
+    public void RunningKeysDropsAStoppedMacrosOutput()
+    {
+        var engine = new FakeKeyEngine();
+        using var runner = new MacroRunner(engine);
+
+        var macro = new KeyMacro("Macro", new[] { 0x52 }, "R", 25);
+        runner.Start(macro);
+        Assert.Contains(0x52, runner.RunningKeys());
+
+        runner.Stop("Macro");
+        Thread.Sleep(100);
+
+        Assert.DoesNotContain(0x52, runner.RunningKeys());
+    }
+
+    [Fact]
+    public void RunningKeysNeverReportsADisabledMacrosOutput()
+    {
+        var engine = new FakeKeyEngine();
+        using var runner = new MacroRunner(engine);
+
+        var macro = new KeyMacro("Off", new[] { 0x52 }, "R", 25, enabled: false);
+        runner.Start(macro);
+
+        Assert.Empty(runner.RunningKeys());
+    }
 }
