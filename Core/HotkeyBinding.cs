@@ -16,16 +16,17 @@ public sealed record HotkeyBinding(int Code, string Name)
 {
     /// <summary>No key. Polls as never-pressed, and reads as "Not set" on its button.</summary>
     /// <remarks>
-    /// Code 0 doubles as two different things: "not set" here, and, on macOS,
-    /// the real code of <c>kVK_ANSI_A</c> — so the A key cannot currently be
-    /// bound or sent (see the filter at <c>Engine/MacHotkeyWatcher.cs</c>,
-    /// which admits only <c>code is &gt; 0 and &lt; 128</c>). Pre-existing, not
-    /// introduced here, and not fixed here: every settings file already on disk
-    /// uses 0 to mean unbound, so treating 0 as a real, bindable key needs a
-    /// migration of that stored meaning, not a change to this sentinel or to
-    /// the watcher's filter.
+    /// -1, not 0: on macOS 0 is a real key (<c>kVK_ANSI_A</c>), so a sentinel
+    /// meaning "no key at all" has to be a value no key can take. Every
+    /// settings and macro file already on disk was written when 0 meant
+    /// unbound and A could not be bound — <c>AppSettings.SchemaVersion</c> and
+    /// <c>MacroStore</c>'s own file-level version are what tell an old stored
+    /// 0 (still "unbound") apart from a current one ("A"), and each is
+    /// migrated to -1 the first time it is read under the new schema so a
+    /// pre-existing unbound hotkey never turns into a bound A the moment this
+    /// build opens someone's old file.
     /// </remarks>
-    public static readonly HotkeyBinding Unbound = new(0, "Not set");
+    public static readonly HotkeyBinding Unbound = new(-1, "Not set");
 
-    public bool IsValid => Code != 0;
+    public bool IsValid => Code >= 0;
 }

@@ -558,7 +558,7 @@ public partial class MainWindow : Window
 
         // The key on the button, the way the Windows build shows it, so the
         // binding is readable without looking at the card below.
-        string key = _settings.HotkeyCode == 0 ? "" : _settings.HotkeyName + "  ";
+        string key = _settings.HotkeyCode < 0 ? "" : _settings.HotkeyName + "  ";
 
         StartStopButton.Content = key + (running ? "STOP" : "START");
 
@@ -845,7 +845,10 @@ public partial class MainWindow : Window
     /// </remarks>
     private void Fire(int code)
     {
-        if (code == 0) return;
+        // Not "== 0": 0 is the A key now, and a hotkey bound to A must fire
+        // like any other. Only a negative code — HotkeyBinding.Unbound's
+        // sentinel — means nothing was pressed.
+        if (code < 0) return;
         if (_macros.RunningKeys().Contains(code)) return;
 
         if (code == _settings.HotkeyCode)
@@ -877,7 +880,7 @@ public partial class MainWindow : Window
     /// </remarks>
     private void Lifted(int code)
     {
-        if (code == 0 || code != _settings.HotkeyCode) return;
+        if (code < 0 || code != _settings.HotkeyCode) return;
         if (HoldModeButton.IsChecked != true) return;
 
         if (_clicker.IsRunning) Toggle();
@@ -910,22 +913,6 @@ public partial class MainWindow : Window
             _hotkeys.CaptureNext((code, name) => Dispatcher.UIThread.Post(() =>
             {
                 _rebinding = false;
-
-                // Code 0 is both "not set" and, on macOS, the A key's real code
-                // (see HotkeyBinding.Unbound) — so a press of A here has to be
-                // refused with an explanation, the same one BindMacroHotkey
-                // gives, rather than stored as a hotkey that looks bound ("A")
-                // but can never fire: MacHotkeyWatcher.Bindable(0) is false, so
-                // ArmHotkeys never actually watches it, and Fire() returns
-                // early on code 0 anyway — a dead hotkey that displays as set.
-                if (code == 0)
-                {
-                    button.Content = previous;
-
-                    HotkeyNoticeText.Text = MacroStore.UnbindableAMessage;
-                    HotkeyNoticeText.IsVisible = true;
-                    return;
-                }
 
                 // One key, one action. Bound twice, only the first would ever
                 // run — which reads as a hotkey that quietly stopped working
@@ -3018,7 +3005,7 @@ public partial class MainWindow : Window
     private void RefreshHotkeySummary()
     {
         string[] bound = Bindings()
-            .Where(b => b.Code != 0)
+            .Where(b => b.Code >= 0)
             .Select(b => $"{b.Action}: {b.Name}")
             .ToArray();
 

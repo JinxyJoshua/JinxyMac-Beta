@@ -44,20 +44,22 @@ public class SwitcherMacroTests
     }
 
     /// <summary>
-    /// A is one letter, same as any other — "Both slots need one letter or
-    /// digit" would be untrue of it specifically. Whichever slot names A gets
-    /// MacroStore's own explanation instead, the same one the Macros page
-    /// gives for a typed A.
+    /// A is one letter, same as any other, now that its real macOS code (0)
+    /// no longer collides with HotkeyBinding.Unbound's sentinel (-1). Either
+    /// slot may be A (including lowercase, since ParseKeys upper-cases) and
+    /// the switcher builds exactly as it would for any other letter.
     /// </summary>
     [Theory]
     [InlineData("A", "1")]
     [InlineData("3", "a")]
-    public void NamingTheASlotExplainsWhyRatherThanBlamingTheFormat(string slotA, string slotB)
+    public void EitherSlotCanBeA(string slotA, string slotB)
     {
         SwitcherMacro.Result result = SwitcherMacro.Build(slotA, slotB, 150, 900, 60, 100);
 
-        Assert.Null(result.Macro);
-        Assert.Equal(MacroStore.UnbindableAMessage, result.Error);
+        Assert.NotNull(result.Macro);
+        Assert.Null(result.Error);
+        Assert.Equal(2, result.Macro!.Keys.Length);
+        Assert.Contains(KeyCodes.For('A')!.Value, result.Macro.Keys);
     }
 
     [Theory]

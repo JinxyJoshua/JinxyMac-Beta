@@ -181,17 +181,6 @@ public partial class MainWindow
         {
             _rebinding = false;
 
-            // Code 0 is both "not set" and, on macOS, the A key's real code
-            // (see HotkeyBinding.Unbound) — so a press of A here has to be
-            // refused with an explanation, not stored as if nothing had been
-            // pressed at all.
-            if (code == 0)
-            {
-                button.Content = previous;
-                ShowMacroHotkeyNotice(MacroStore.UnbindableAMessage);
-                return;
-            }
-
             string? taken = HotkeyHolder(code, macro);
 
             if (taken != null)
@@ -327,9 +316,7 @@ public partial class MainWindow
 
         if (keys == null)
         {
-            ShowMacroNotice(MacroStore.MentionsUnbindableA(typed)
-                ? MacroStore.UnbindableAMessage
-                : "Each key box takes one letter or digit — R, or 1, or Q.");
+            ShowMacroNotice("Each key box takes one letter or digit — R, or 1, or Q.");
             return;
         }
 

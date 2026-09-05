@@ -43,16 +43,11 @@ public static class KeyCodes
     /// hardware order is neither alphabetical nor numeric (5 and 6 really are
     /// swapped — code 23 is "5", code 22 is "6"), so a formula would be wrong
     /// exactly where getting it right mattered.
-    ///
-    /// 'A' is deliberately absent and falls through to null. Its real code is
-    /// 0, which is also <see cref="HotkeyBinding.Unbound"/>'s sentinel for
-    /// "no key" — see the remarks there for why that collision is
-    /// pre-existing and is not being fixed here.
     /// </remarks>
     internal static int? Mac(char letterOrDigit) => char.ToUpperInvariant(letterOrDigit) switch
     {
-        // Letters. 'A' => 0 is omitted on purpose; see the remarks above.
-        'B' => 11, 'C' => 8, 'D' => 2, 'E' => 14, 'F' => 3,
+        // Letters.
+        'A' => 0, 'B' => 11, 'C' => 8, 'D' => 2, 'E' => 14, 'F' => 3,
         'G' => 5, 'H' => 4, 'I' => 34, 'J' => 38, 'K' => 40, 'L' => 37,
         'M' => 46, 'N' => 45, 'O' => 31, 'P' => 35, 'Q' => 12, 'R' => 15,
         'S' => 1, 'T' => 17, 'U' => 32, 'V' => 9, 'W' => 13, 'X' => 7,

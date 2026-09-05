@@ -126,7 +126,7 @@ public partial class MainWindow
     {
         if (_rebinding) return;
 
-        _settings.SwitcherHotkeyCode = 0;
+        _settings.SwitcherHotkeyCode = -1;
         _settings.SwitcherHotkeyName = HotkeyBinding.Unbound.Name;
         SwitcherHotkeyButton.Content = HotkeyBinding.Unbound.Name;
 
