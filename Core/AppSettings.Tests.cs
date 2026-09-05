@@ -101,6 +101,39 @@ public class AppSettingsTests
     }
 
     /// <summary>
+    /// Pins the exact regression this schema exists to prevent: a real A
+    /// binding (HotkeyCode 0) already at CurrentSchema must survive a second
+    /// load unchanged — both in memory and on disk. A future change that
+    /// migrated by value instead of by version (rewriting any stored 0, not
+    /// just ones below CurrentSchema) would turn this legitimate A binding
+    /// back into "unbound" the second time the file is read, and nothing
+    /// else in this suite checks a repeat load of an already-current file
+    /// with code 0 specifically — <see cref="LoadingASettingsFileTwiceDoesNotDoubleMigrateOrLoseARealBinding"/>
+    /// uses 15.
+    /// </summary>
+    [Fact]
+    public void LoadingAnAlreadyCurrentHotkeyCodeZeroFileTwiceStillReadsAsABothTimes()
+    {
+        WithSettingsFile(
+            $$"""{"SchemaVersion":{{AppSettings.CurrentSchema}},"HotkeyCode":0,"HotkeyName":"A"}""",
+            () =>
+            {
+                AppSettings first = AppSettings.Load();
+                Assert.Equal(0, first.HotkeyCode);
+                Assert.True(new HotkeyBinding(first.HotkeyCode, first.HotkeyName).IsValid);
+
+                AppSettings second = AppSettings.Load();
+                Assert.Equal(0, second.HotkeyCode);
+                Assert.True(new HotkeyBinding(second.HotkeyCode, second.HotkeyName).IsValid);
+
+                string raw = File.ReadAllText(SettingsFilePath);
+                using var doc = System.Text.Json.JsonDocument.Parse(raw);
+                Assert.Equal(0, doc.RootElement.GetProperty("HotkeyCode").GetInt32());
+                Assert.Equal(AppSettings.CurrentSchema, doc.RootElement.GetProperty("SchemaVersion").GetInt32());
+            });
+    }
+
+    /// <summary>
     /// Loading a pre-schema file twice must not re-run the migration (the
     /// file is already at CurrentSchema after the first load) and must not
     /// disturb a real, already-bound hotkey along the way — only a stored 0
@@ -122,6 +155,36 @@ public class AppSettingsTests
                 string raw = File.ReadAllText(SettingsFilePath);
                 using var doc = System.Text.Json.JsonDocument.Parse(raw);
                 Assert.Equal(AppSettings.CurrentSchema, doc.RootElement.GetProperty("SchemaVersion").GetInt32());
+            });
+    }
+
+    /// <summary>
+    /// The catch path (a corrupt or unreadable settings file) must stamp
+    /// CurrentSchema exactly like the missing-file path does. Without that,
+    /// a hotkey bound against those defaults — including A, HotkeyCode 0 —
+    /// would look like a pre-schema file on the very next launch and get
+    /// migrated back to -1, silently wiping the binding.
+    /// </summary>
+    [Fact]
+    public void ACorruptFileStampsCurrentSchemaSoARealABindingSurvivesTheNextLoad()
+    {
+        WithSettingsFile(
+            "{ this is not valid json",
+            () =>
+            {
+                AppSettings afterCorruption = AppSettings.Load();
+                Assert.Equal(AppSettings.CurrentSchema, afterCorruption.SchemaVersion);
+
+                // Simulate binding A against those defaults and saving, as a
+                // user would.
+                afterCorruption.HotkeyCode = 0;
+                afterCorruption.HotkeyName = "A";
+                afterCorruption.Save();
+
+                AppSettings reloaded = AppSettings.Load();
+
+                Assert.Equal(0, reloaded.HotkeyCode);
+                Assert.True(new HotkeyBinding(reloaded.HotkeyCode, reloaded.HotkeyName).IsValid);
             });
     }
 }

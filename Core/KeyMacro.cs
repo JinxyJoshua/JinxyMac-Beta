@@ -710,8 +710,23 @@ public static class MacroStore
 
                 file.SchemaVersion = CurrentSchema;
 
-                File.WriteAllText(MacrosFile,
-                    JsonSerializer.Serialize(file, new JsonSerializerOptions { WriteIndented = true }));
+                try
+                {
+                    File.WriteAllText(MacrosFile,
+                        JsonSerializer.Serialize(file, new JsonSerializerOptions { WriteIndented = true }));
+                }
+                catch
+                {
+                    // A read-only file, a full disk, a lock — whatever it is,
+                    // it must not fall through to the outer catch below: that
+                    // would discard the macros already deserialized (and
+                    // migrated in memory) above, and the very next
+                    // MacroStore.Save would then overwrite the real file with
+                    // that empty list, making the loss permanent. Returning
+                    // the migrated macros here even though the persist failed
+                    // is safe because the migration is idempotent — this file
+                    // will just migrate again next launch.
+                }
             }
 
             return file.Macros

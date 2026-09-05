@@ -184,7 +184,14 @@ public sealed class AppSettings
         }
         catch
         {
-            return new AppSettings();
+            // Same reasoning as the missing-file path above: a fresh set of
+            // defaults has nothing to migrate, so it starts at the current
+            // schema. Leaving SchemaVersion at its default of 0 here would
+            // make the next launch "migrate" a hotkey the user binds against
+            // these defaults — including A, HotkeyCode 0 — right back to -1,
+            // silently unbinding it the first time a corrupt or unreadable
+            // file is replaced by a real one.
+            return new AppSettings { SchemaVersion = CurrentSchema };
         }
     }
 
