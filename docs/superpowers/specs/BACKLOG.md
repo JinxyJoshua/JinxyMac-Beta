@@ -11,6 +11,29 @@ spec before implementation — they are features to build, not fixes to port.
 - Windows app: `C:\Users\rschi\_dev\Joshua\MyBlinkStyleClicker\MyBlinkStyleClicker`
 - Mac app: `C:\Users\rschi\_dev\Joshua\JinxyMac`
 
+**A prepared dump of the exact source to port** sits at
+`C:\Users\rschi\_dev\Joshua\WINDOWS-CODE-TO-PORT.txt` — 4,006 lines, 178 KB,
+eight sections. Read only the section you need; the whole file does not fit
+comfortably in one context and does not need to.
+
+| Line | Section |
+| --- | --- |
+| 4 | `KeyMacro.cs` — macro + auto switcher engine |
+| 807 | `KitWheel.cs` — roster, rolling, presets, storage |
+| 1159 | `MainWindow.KitWheel.cs` — page logic |
+| 2003 | `KitImages.cs` — picture lookup |
+| 2181 | `KitArt.cs` — wiki naming and parsing |
+| 2394 | `KitArtFetch.cs` — downloading missing art |
+| 2543 | `KitArtImage.cs` — decode and framing |
+| 2731 | `MacroBadge.cs` — streamer mode badge |
+
+The dump's own header states the thing worth knowing before starting:
+**the switcher is not a separate engine.** It is a `KeyMacro` under a reserved
+name (`" AutoSwitcher"`), so one file is both features. A macro spamming one
+key is the macro creator; a macro alternating two keys is the switcher.
+Building the general one gets the specific one for free — the alternative was
+two engines that drift apart.
+
 Read these before porting.
 
 **Macros and the auto switcher share one engine** — they are one spec, not two:
