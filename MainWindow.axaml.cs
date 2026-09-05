@@ -226,13 +226,13 @@ public partial class MainWindow : Window
     {
         Wire(NavClicker, PageClicker, "Clicker", "Configure your own click engine");
         Wire(NavPresets, PagePresets, "Presets", "Saved click configurations");
+        Wire(NavMacros, PageMacros, "Macros", "Spam a key, or cycle a few");
+        Wire(NavSwitcher, PageSwitcher, "Auto Switcher", "Swap between two hotbar slots");
         Wire(NavRecorder, PageRecorder, "Recorder", "Screen capture, hardware encoded");
         Wire(NavHistory, PageHistory, "History", "Time spent clicking, and how much of it landed");
         Wire(NavTheme, PageTheme, "Theme", "Accent colour");
         Wire(NavSettings, PageSettings, "Settings", "Where things are stored, and what this build can do");
         Wire(NavKitWheel, PageKitWheel, "Kit Wheel", "Roll a kit you have not played yet");
-        Wire(NavMacros, PageMacros, "Macros", "Spam a key, or cycle a few");
-        Wire(NavSwitcher, PageSwitcher, "Auto Switcher", "Swap between two hotbar slots");
 
         void Wire(RadioButton button, Control page, string title, string subtitle) =>
             button.IsCheckedChanged += (_, _) =>

@@ -230,13 +230,13 @@
                     <RadioButton Classes="nav" GroupName="Nav" Content="Clicker"
                                  IsChecked="True" Name="NavClicker"/>
                     <RadioButton Classes="nav" GroupName="Nav" Content="Presets" Name="NavPresets"/>
+                    <RadioButton Classes="nav" GroupName="Nav" Content="Macros" Name="NavMacros"/>
+                    <RadioButton Classes="nav" GroupName="Nav" Content="Auto Switcher" Name="NavSwitcher"/>
                     <RadioButton Classes="nav" GroupName="Nav" Content="Recorder" Name="NavRecorder"/>
                     <RadioButton Classes="nav" GroupName="Nav" Content="History" Name="NavHistory"/>
                     <RadioButton Classes="nav" GroupName="Nav" Content="Theme" Name="NavTheme"/>
                     <RadioButton Classes="nav" GroupName="Nav" Content="Settings" Name="NavSettings"/>
                     <RadioButton Classes="nav" GroupName="Nav" Content="Kit Wheel" Name="NavKitWheel"/>
-                    <RadioButton Classes="nav" GroupName="Nav" Content="Macros" Name="NavMacros"/>
-                    <RadioButton Classes="nav" GroupName="Nav" Content="Auto Switcher" Name="NavSwitcher"/>
                 </StackPanel>
 
                 <TextBlock DockPanel.Dock="Bottom" Name="EngineNote"
