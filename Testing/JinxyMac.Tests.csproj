@@ -40,6 +40,9 @@
     <!-- Pulled in as dependencies of the above, not tested directly. -->
     <Compile Include="../Core/SettingsPath.cs" />
     <Compile Include="../Capture/Ffmpeg.cs" />
+    <Compile Include="../Core/Clicker.cs" />
+    <Compile Include="../Core/Clicker.Tests.cs" />
+    <Compile Include="../Engine/IClickEngine.cs" />
   </ItemGroup>
 
   <ItemGroup>

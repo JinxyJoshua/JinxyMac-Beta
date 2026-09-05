@@ -8,7 +8,8 @@ namespace JinxyMac.Core;
 /// A record passed by reference rather than fields the loop reaches for. UI
 /// controls have thread affinity, and the loop must never touch them.
 /// </remarks>
-public sealed record ClickSettings(double Cps, double Duty, bool HitFix, bool Spin)
+public sealed record ClickSettings(
+    double Cps, double Duty, bool HitFix, bool Spin, ClickButton Button = ClickButton.Left)
 {
     public ClickTiming Timing => ClickTimings.Resolve(Cps, Duty, HitFix);
 }
@@ -73,7 +74,10 @@ public sealed class Clicker : IDisposable
 
     private void Loop(CancellationToken token)
     {
-        bool buttonDown = false;
+        // The button actually pressed, which is not necessarily the one
+        // selected now. A release naming a different button leaves the pressed
+        // one down across the whole desktop with nothing to release it.
+        ClickButton? held = null;
         long freq = Stopwatch.Frequency;
         long deadline = Stopwatch.GetTimestamp();
 
@@ -104,16 +108,18 @@ public sealed class Clicker : IDisposable
 
                 lock (_inputGate)
                 {
-                    _engine.MouseDown();
-                    buttonDown = true;
+                    ClickButton pressing = s.Button;
+
+                    _engine.MouseDown(pressing);
+                    held = pressing;
                     deadline += (long)(downMs * freq / 1000.0);
 
                     cancelled = !WaitUntil(deadline, s.Spin, token);
 
                     if (!cancelled)
                     {
-                        _engine.MouseUp();
-                        buttonDown = false;
+                        _engine.MouseUp(pressing);
+                        held = null;
                         Interlocked.Increment(ref _clicks);
                     }
                 }
@@ -132,7 +138,8 @@ public sealed class Clicker : IDisposable
         }
         finally
         {
-            if (buttonDown) _engine.MouseUp();
+            // The one that was pressed, whatever is selected now.
+            if (held is ClickButton stuck) _engine.MouseUp(stuck);
         }
     }
 

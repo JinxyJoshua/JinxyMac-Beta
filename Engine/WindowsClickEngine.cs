@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using JinxyMac.Core;
 
 namespace JinxyMac.Engine;
 
@@ -20,9 +21,23 @@ public sealed class WindowsClickEngine : IClickEngine
 
     public string? Unavailable => OperatingSystem.IsWindows() ? null : "Not running on Windows.";
 
-    public void MouseDown() => Send(MouseEventLeftDown, 0, 0);
+    public void MouseDown(ClickButton button) => Send(DownFlag(button), 0, 0);
 
-    public void MouseUp() => Send(MouseEventLeftUp, 0, 0);
+    public void MouseUp(ClickButton button) => Send(UpFlag(button), 0, 0);
+
+    private static uint DownFlag(ClickButton button) => button switch
+    {
+        ClickButton.Right => MouseEventRightDown,
+        ClickButton.Middle => MouseEventMiddleDown,
+        _ => MouseEventLeftDown
+    };
+
+    private static uint UpFlag(ClickButton button) => button switch
+    {
+        ClickButton.Right => MouseEventRightUp,
+        ClickButton.Middle => MouseEventMiddleUp,
+        _ => MouseEventLeftUp
+    };
 
     public void MoveBy(int dx, int dy)
     {
@@ -51,6 +66,10 @@ public sealed class WindowsClickEngine : IClickEngine
     private const uint MouseEventMove = 0x0001;
     private const uint MouseEventLeftDown = 0x0002;
     private const uint MouseEventLeftUp = 0x0004;
+    private const uint MouseEventRightDown = 0x0008;
+    private const uint MouseEventRightUp = 0x0010;
+    private const uint MouseEventMiddleDown = 0x0020;
+    private const uint MouseEventMiddleUp = 0x0040;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct INPUT
