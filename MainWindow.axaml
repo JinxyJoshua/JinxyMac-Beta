@@ -1461,13 +1461,18 @@
                                 <TextBlock Classes="hint"
                                            Text="One letter or digit per box. Fill the second and the macro alternates between the two; leave it empty and it just spams the first."/>
 
-                                <!-- The toggle-hotkey column is 150 and not 110 because
-                                     "TOGGLE HOTKEY (OPTIONAL)" is the widest label in the
-                                     row and 110 clipped it to "TOGGLE HOTKEY (OPTIO". The
-                                     width comes out of the name field, which is starred
-                                     and had it to spare. -->
+                                <!-- The two columns whose captions are longer than their
+                                     inputs are Auto, not a fixed width. "TOGGLE HOTKEY
+                                     (OPTIONAL)" in a 110px column rendered as "TOGGLE
+                                     HOTKEY (OPTIO", and hard-coding a wider number would
+                                     only be right for the font it was measured in — this
+                                     app ships on macOS, where the UI font is not the one
+                                     these were measured against. Auto asks the label how
+                                     wide it actually is, in whatever font is in use. The
+                                     inputs carry a MinWidth so the column cannot collapse
+                                     to the caption and leave an unusably narrow box. -->
                                 <Grid Margin="0,14,0,0"
-                                      ColumnDefinitions="*,10,80,10,110,10,150,10,90,10,Auto">
+                                      ColumnDefinitions="*,10,80,10,Auto,10,Auto,10,90,10,Auto">
                                     <StackPanel Grid.Column="0">
                                         <TextBox Name="MacroNameBox" Watermark="Name"/>
                                         <TextBlock Text="NAME" Classes="tiny" Margin="0,6,0,0"/>
@@ -1477,13 +1482,13 @@
                                         <TextBlock Text="KEY" Classes="tiny" Margin="0,6,0,0"/>
                                     </StackPanel>
                                     <StackPanel Grid.Column="4">
-                                        <TextBox Name="MacroKey2Box" MaxLength="1"/>
+                                        <TextBox Name="MacroKey2Box" MaxLength="1" MinWidth="110"/>
                                         <TextBlock Text="2ND KEY (OPTIONAL)" Classes="tiny" Margin="0,6,0,0"/>
                                     </StackPanel>
                                     <StackPanel Grid.Column="6">
                                         <Button Name="NewMacroHotkeyButton" Content="Not set"
                                                 Height="34" Padding="12,0" HorizontalAlignment="Stretch"
-                                                HorizontalContentAlignment="Center"
+                                                MinWidth="110" HorizontalContentAlignment="Center"
                                                 ToolTip.Tip="Click, then press a key or mouse side button"/>
                                         <TextBlock Text="TOGGLE HOTKEY (OPTIONAL)" Classes="tiny" Margin="0,6,0,0"/>
                                     </StackPanel>
