@@ -1,8 +1,17 @@
 Jinxy AutoClicker — Mac
 =======================
 
-Runs on Apple silicon and Intel Macs, macOS 13 or later.
-Nothing to install. The app carries everything it needs.
+Runs on macOS 13 or later. Nothing to install; the app carries everything
+it needs.
+
+There are two downloads and they are not interchangeable:
+
+  JinxyMac-mac.tar.gz          Apple silicon (M1, M2, M3, M4)
+  JinxyMac-mac-intel.tar.gz    Intel
+
+Apple menu › About This Mac tells you which you have. Before 1.2.3 there was a
+single download holding both, and that is what stopped clicking working at all
+— see the end of this file.
 
 
 OPENING IT THE FIRST TIME
@@ -44,6 +53,10 @@ demand, so you never have to guess which one is missing.
 
 Add JinxyMac with the + button in each list. macOS usually asks you to quit and
 reopen the app after granting Accessibility. It means it.
+
+If you are updating from 1.2.2 or earlier, remove the old JinxyMac entry with
+the minus button before adding this one. The app was replaced, so the old entry
+points at something that is no longer there and macOS will not match it.
 
 
 RECORDING NEEDS FFMPEG
@@ -91,3 +104,15 @@ hotkeys, screen capture, the menu bar — could not be run before release.
 
 If something misbehaves, the fault is far more likely to be in those parts than
 anywhere else, and knowing exactly what you saw is genuinely useful.
+
+That is not hypothetical. Every build before 1.2.3 shipped one download holding
+both architectures, picked at startup by a small script. macOS works out which
+app a running program belongs to from where its executable sits, and that script
+left the real program one folder too deep — so as far as the system was
+concerned the app had no identity at all. The visible symptom was the menu bar
+reading "Avalonia Application" instead of Jinxy. The one that mattered was that
+Accessibility could never be granted: the permission is given to JinxyMac.app,
+and the process asking for it was not recognised as being JinxyMac.app. Ticking
+the box did nothing, every time, for everybody, since 1.0.7. It is fixed here by
+shipping one proper app per architecture, which is why there are now two
+downloads.

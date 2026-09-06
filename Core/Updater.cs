@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Net.Http;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 
 namespace JinxyMac.Core;
@@ -35,7 +36,7 @@ public static class Updater
     /// build-mac.sh reads this and writes it into Info.plist, so the number in
     /// the bundle cannot drift from the number the updater compares against.
     /// </remarks>
-    public const string Version = "1.2.2";
+    public const string Version = "1.2.3";
 
     /// <summary>
     /// The repository this build updates from, and reads its config from.
@@ -106,12 +107,19 @@ public static class Updater
 
             if (!IsNewer(version, Version)) return null;
 
-            foreach (JsonElement asset in root.GetProperty("assets").EnumerateArray())
+            // Two downloads since 1.2.3, one per architecture, so the right
+            // one has to be picked rather than whichever GitHub lists first.
+            // Ordered so the match is tried before the fallback: a release
+            // carrying only one tarball still updates, and so does a client
+            // running under Rosetta, which reports itself as x64 and should
+            // stay on the x64 build rather than be moved sideways mid-update.
+            var assets = root.GetProperty("assets").EnumerateArray()
+                .Where(a => (a.GetProperty("name").GetString() ?? "")
+                    .EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(a => IsForThisMac(a.GetProperty("name").GetString() ?? ""));
+
+            foreach (JsonElement asset in assets)
             {
-                string name = asset.GetProperty("name").GetString() ?? "";
-
-                if (!name.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase)) continue;
-
                 string url = asset.GetProperty("browser_download_url").GetString() ?? "";
 
                 // A reply is JSON from an API call that host-pinning already
@@ -133,6 +141,26 @@ public static class Updater
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// Whether a release asset is the build for the architecture this process
+    /// is running as.
+    /// </summary>
+    /// <remarks>
+    /// The Intel tarball is the one that says so in its name; the Apple
+    /// silicon build keeps the plain name it has always had, so that a client
+    /// shipped before this method existed — every 1.0.8 and 1.2.2 install —
+    /// still finds something it can use in the first asset it looks at.
+    ///
+    /// Matching on the name rather than on anything inside the file because
+    /// this runs against a JSON listing, before a single byte is downloaded.
+    /// </remarks>
+    internal static bool IsForThisMac(string assetName)
+    {
+        bool intel = assetName.Contains("intel", StringComparison.OrdinalIgnoreCase);
+
+        return RuntimeInformation.ProcessArchitecture == Architecture.X64 ? intel : !intel;
     }
 
     /// <summary>

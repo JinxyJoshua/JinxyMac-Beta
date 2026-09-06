@@ -178,4 +178,40 @@ public class UpdaterTests
         Assert.Null(found);
         Assert.True(clock.Elapsed < TimeSpan.FromSeconds(2), $"took {clock.Elapsed}");
     }
+
+    // ---- picking the tarball for this Mac ----
+
+    /// <summary>
+    /// Since 1.2.3 a release carries two tarballs, one per architecture,
+    /// because the single bundle that used to hold both could not be granted
+    /// Accessibility at all. Picking the wrong one is not fatal — an Intel
+    /// build runs on Apple silicon under Rosetta — but it is a slower app and
+    /// a second copy of the runtime, so it is worth getting right.
+    /// </summary>
+    [Theory]
+    [InlineData("JinxyMac-mac.tar.gz", false)]
+    [InlineData("JinxyMac-mac-intel.tar.gz", true)]
+    [InlineData("JinxyMac-mac-INTEL.tar.gz", true)]
+    public void TellsTheIntelTarballFromTheAppleSiliconOne(string asset, bool isIntel)
+    {
+        bool x64 = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture
+            == System.Runtime.InteropServices.Architecture.X64;
+
+        // On an x64 process the Intel asset is the match; on anything else the
+        // plain one is. Asserted against the running architecture rather than a
+        // hardcoded answer, so this test means the same thing on the PC it was
+        // written on and on the Mac it ships to.
+        Assert.Equal(x64 == isIntel, Updater.IsForThisMac(asset));
+    }
+
+    /// <summary>
+    /// The name every 1.0.8 and 1.2.2 install already looks for. It has to stay
+    /// the Apple silicon build's name: those clients take the first tarball
+    /// they see and have no idea there is a choice.
+    /// </summary>
+    [Fact]
+    public void TheAppleSiliconAssetKeepsThePlainName()
+    {
+        Assert.False("JinxyMac-mac.tar.gz".Contains("intel", StringComparison.OrdinalIgnoreCase));
+    }
 }

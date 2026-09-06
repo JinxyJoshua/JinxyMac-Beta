@@ -8,7 +8,17 @@
     <key>CFBundleDisplayName</key>
     <string>Jinxy AutoClicker</string>
 
-    <!-- The launcher script, not a binary. It picks the architecture. -->
+    <!--
+        The real apphost, sitting at Contents/MacOS/JinxyMac. It must be an
+        actual binary and it must be at exactly this path: macOS matches a
+        running process to its bundle by finding the executable at
+        Contents/MacOS/<CFBundleExecutable>, and everything that makes an app
+        an app hangs off that match. Until 1.2.2 this named a /bin/sh script
+        that exec'd a binary one directory deeper, which broke the match — no
+        Info.plist, no bundle name in the menu bar, and Accessibility could
+        never be granted, because the permission belongs to the bundle and the
+        process asking was not recognised as being it.
+    -->
     <key>CFBundleExecutable</key>
     <string>JinxyMac</string>
 
