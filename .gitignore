@@ -19,3 +19,4 @@ Packaging/JinxyMac.icns
 
 # Subagent-driven-development scratch: ledger, briefs, review packages.
 .superpowers/
+.tools/

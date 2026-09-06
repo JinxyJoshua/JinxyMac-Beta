@@ -35,6 +35,23 @@ Two ways past it. Either works.
 
       Adjust the path if you put the app somewhere other than Applications.
 
+
+IF IT SAYS "DAMAGED AND CAN'T BE OPENED"
+----------------------------------------
+
+Click Cancel. Do not move it to the Trash — the download is not damaged and
+that message is not about the file being broken.
+
+It is what macOS says about a quarantined app whose bundle it cannot make sense
+of, and unlike the message above, right-click and Open does NOT clear it. The
+one-liner does:
+
+    xattr -dr com.apple.quarantine /Applications/JinxyMac.app
+
+1.2.3 is the first build sealed properly enough that this should not come up.
+If you see it anyway, that is worth reporting — it means the sealing did not
+take, and it was checked on a PC rather than a Mac.
+
 Drag JinxyMac.app to your Applications folder first if you want it to stay put.
 
 
