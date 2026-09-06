@@ -17,6 +17,10 @@ public class UpdaterTests
     [InlineData("1.0.3", "1.0.2")]
     [InlineData("1.1.0", "1.0.9")]
     [InlineData("2.0.0", "1.9.9")]
+    // The hop every installed copy actually makes: 1.0.8 was the last release
+    // for a long stretch, so this is the comparison the updater has to get
+    // right in the field, not just in principle.
+    [InlineData("1.2.2", "1.0.8")]
     public void NoticesANewerBuild(string candidate, string current)
     {
         Assert.True(Updater.IsNewer(candidate, current));
@@ -26,6 +30,7 @@ public class UpdaterTests
     [InlineData("1.0.2", "1.0.2")]
     [InlineData("1.0.1", "1.0.2")]
     [InlineData("0.9.9", "1.0.0")]
+    [InlineData("1.0.8", "1.2.2")]
     public void LeavesTheSameOrOlderAlone(string candidate, string current)
     {
         Assert.False(Updater.IsNewer(candidate, current));
