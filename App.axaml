@@ -5,6 +5,20 @@
 
     <Application.Styles>
         <FluentTheme />
+
+        <!-- Fluent leaves a Button's VerticalContentAlignment at Stretch. For a
+             string label that means the generated TextBlock stretches to the
+             button's height and draws its text at the top of it, so every
+             button given an explicit Height wore its label against the top
+             edge with all the slack below — a 40px "DISABLE HOTKEYS" put 4px
+             above the text and 25px below. Centring it once here fixes every
+             one of them; a button that genuinely wants another alignment still
+             sets it locally. Selector is `Button` and not `:is(Button)` on
+             purpose: the nav and segment RadioButtons are Button-derived and
+             carry their own templates. -->
+        <Style Selector="Button">
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
     </Application.Styles>
 
     <Application.Resources>

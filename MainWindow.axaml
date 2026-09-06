@@ -1453,8 +1453,13 @@
                                 <TextBlock Classes="hint"
                                            Text="One letter or digit per box. Fill the second and the macro alternates between the two; leave it empty and it just spams the first."/>
 
+                                <!-- The toggle-hotkey column is 150 and not 110 because
+                                     "TOGGLE HOTKEY (OPTIONAL)" is the widest label in the
+                                     row and 110 clipped it to "TOGGLE HOTKEY (OPTIO". The
+                                     width comes out of the name field, which is starred
+                                     and had it to spare. -->
                                 <Grid Margin="0,14,0,0"
-                                      ColumnDefinitions="*,10,80,10,110,10,110,10,90,10,Auto">
+                                      ColumnDefinitions="*,10,80,10,110,10,150,10,90,10,Auto">
                                     <StackPanel Grid.Column="0">
                                         <TextBox Name="MacroNameBox" Watermark="Name"/>
                                         <TextBlock Text="NAME" Classes="tiny" Margin="0,6,0,0"/>
