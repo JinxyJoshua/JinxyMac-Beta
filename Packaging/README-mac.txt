@@ -14,6 +14,22 @@ single download holding both, and that is what stopped clicking working at all
 — see the end of this file.
 
 
+THE EASY WAY TO INSTALL
+-----------------------
+
+Open Terminal and paste this. It picks the right build for your Mac, installs
+it, and opens it:
+
+    curl -fsSL https://raw.githubusercontent.com/JinxyJoshua/JinxyMac-Beta/main/install.sh | sh
+
+That is not just convenience. An app downloaded in a browser gets a quarantine
+flag, and a quarantined app that is not signed by a paid Apple Developer
+account is refused with a message saying it is damaged — see below. curl sets
+no such flag, so an app fetched this way simply opens.
+
+Everything under here is for anyone who would rather download it by hand.
+
+
 OPENING IT THE FIRST TIME
 -------------------------
 
