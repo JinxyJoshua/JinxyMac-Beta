@@ -7,7 +7,7 @@ it needs.
 There are two downloads and they are not interchangeable:
 
   JinxyMac-mac.tar.gz          Apple silicon (M1, M2, M3, M4)
-  JinxyMac-mac-intel.tar.gz    Intel
+  JinxyMac-mac_intel.tar.gz    Intel
 
 Apple menu › About This Mac tells you which you have. Before 1.2.3 there was a
 single download holding both, and that is what stopped clicking working at all

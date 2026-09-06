@@ -107,16 +107,17 @@ public static class Updater
 
             if (!IsNewer(version, Version)) return null;
 
-            // Two downloads since 1.2.3, one per architecture, so the right
-            // one has to be picked rather than whichever GitHub lists first.
-            // Ordered so the match is tried before the fallback: a release
-            // carrying only one tarball still updates, and so does a client
-            // running under Rosetta, which reports itself as x64 and should
-            // stay on the x64 build rather than be moved sideways mid-update.
+            // Two downloads since 1.2.3, one per architecture. The match is
+            // required, not preferred: there is no safe fallback, because the
+            // two mismatches are not equally survivable. An Intel build on
+            // Apple silicon runs under Rosetta; an Apple silicon build on an
+            // Intel Mac does not run at all, and offering one would replace a
+            // working app with a bundle that cannot open. Finding nothing that
+            // matches means no update, which is the outcome to prefer.
             var assets = root.GetProperty("assets").EnumerateArray()
                 .Where(a => (a.GetProperty("name").GetString() ?? "")
                     .EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase))
-                .OrderByDescending(a => IsForThisMac(a.GetProperty("name").GetString() ?? ""));
+                .Where(a => IsForThisMac(a.GetProperty("name").GetString() ?? ""));
 
             foreach (JsonElement asset in assets)
             {
@@ -153,8 +154,19 @@ public static class Updater
     /// shipped before this method existed — every 1.0.8 and 1.2.2 install —
     /// still finds something it can use in the first asset it looks at.
     ///
+    /// That last point is why the Intel asset is <c>JinxyMac-mac_intel.tar.gz</c>
+    /// and not <c>-intel</c>: GitHub lists a release's assets alphabetically,
+    /// <c>'-'</c> sorts before <c>'.'</c>, and an older client takes the first
+    /// tarball it sees. Named with a hyphen, the Intel build would be handed
+    /// to every Apple silicon user still on an old build. An underscore sorts
+    /// after the dot and puts them back in the right order.
+    ///
     /// Matching on the name rather than on anything inside the file because
     /// this runs against a JSON listing, before a single byte is downloaded.
+    ///
+    /// A process running under Rosetta reports itself as x64, and taking it at
+    /// its word is right: it should be offered the x64 build it is already
+    /// running, not moved to a different architecture by an update.
     /// </remarks>
     internal static bool IsForThisMac(string assetName)
     {

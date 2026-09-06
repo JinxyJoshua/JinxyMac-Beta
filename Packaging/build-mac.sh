@@ -105,7 +105,7 @@ build() {
 }
 
 build osx-arm64 applesilicon JinxyMac-mac.tar.gz "Apple silicon"
-build osx-x64   intel        JinxyMac-mac-intel.tar.gz "Intel"
+build osx-x64   intel        JinxyMac-mac_intel.tar.gz "Intel"
 
 echo
 echo "Done. Upload JinxyMac-mac.tar.gz FIRST — see Core/Updater.cs on why order matters."

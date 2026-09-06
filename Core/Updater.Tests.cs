@@ -190,8 +190,9 @@ public class UpdaterTests
     /// </summary>
     [Theory]
     [InlineData("JinxyMac-mac.tar.gz", false)]
-    [InlineData("JinxyMac-mac-intel.tar.gz", true)]
+    [InlineData("JinxyMac-mac_intel.tar.gz", true)]
     [InlineData("JinxyMac-mac-INTEL.tar.gz", true)]
+    [InlineData("JinxyMac-mac_INTEL.tar.gz", true)]
     public void TellsTheIntelTarballFromTheAppleSiliconOne(string asset, bool isIntel)
     {
         bool x64 = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture
@@ -213,5 +214,25 @@ public class UpdaterTests
     public void TheAppleSiliconAssetKeepsThePlainName()
     {
         Assert.False("JinxyMac-mac.tar.gz".Contains("intel", StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// GitHub lists a release's assets alphabetically and every 1.0.8 and
+    /// 1.2.2 client takes the first tarball it finds, so the Apple silicon
+    /// build has to sort first or those users are handed an Intel app. This
+    /// is the bug that shipped for twenty minutes: named with a hyphen, the
+    /// Intel asset sorted first, because '-' comes before '.'.
+    /// </summary>
+    [Fact]
+    public void TheAppleSiliconAssetSortsBeforeTheIntelOne()
+    {
+        Assert.True(
+            string.CompareOrdinal("JinxyMac-mac.tar.gz", "JinxyMac-mac_intel.tar.gz") < 0,
+            "the Apple silicon tarball must sort first for older clients");
+
+        // What it must not go back to.
+        Assert.True(
+            string.CompareOrdinal("JinxyMac-mac.tar.gz", "JinxyMac-mac-intel.tar.gz") > 0,
+            "a hyphen would put the Intel build first again");
     }
 }
