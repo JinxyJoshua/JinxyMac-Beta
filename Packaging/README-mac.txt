@@ -64,9 +64,9 @@ one-liner does:
 
     xattr -dr com.apple.quarantine /Applications/JinxyMac.app
 
-1.2.3 is the first build sealed properly enough that this should not come up.
-If you see it anyway, that is worth reporting — it means the sealing did not
-take, and it was checked on a PC rather than a Mac.
+Installing with the curl line at the top of this file avoids it entirely, which
+is why that is the recommended way. The flag comes from the browser, not from
+the app, and curl does not set it.
 
 Drag JinxyMac.app to your Applications folder first if you want it to stay put.
 

@@ -42,41 +42,34 @@ project=$(dirname "$here")
 out="$project/dist"
 
 # ---------------------------------------------------------------------------
-# Signing
+# Why the bundles are NOT code signed
 # ---------------------------------------------------------------------------
 #
-# The bundles are ad-hoc signed. Not with an Apple Developer certificate — that
-# needs the $99 account and a Mac to notarise from — but sealed well enough
-# that macOS recognises them as coherent apps.
+# 1.2.3 tried to ad-hoc sign them with rcodesign, to stop macOS calling a
+# browser download damaged. It made things worse, and the proof is what
+# codesign said on a real Mac:
 #
-# This is not optional polish. .NET leaves the apphost ad-hoc signed under the
-# identifier "apphost", every dylib signed by Microsoft, and the BUNDLE not
-# sealed at all: no Contents/_CodeSignature/CodeResources, and a main
-# executable whose signing identifier does not match CFBundleIdentifier. A
-# quarantined app in that state does not get the familiar "unidentified
-# developer" prompt that right-click-Open clears. It gets
+#     /Applications/JinxyMac.app: a sealed resource is missing or invalid
+#     file added: .../System.Text.Json.dll
+#     file added: .../kits/Crocowolf.png          (and ~200 more)
 #
-#     "JinxyMac" is damaged and can't be opened. You should move it to the Trash.
+# macOS treats everything under Contents/MacOS as nested code that must itself
+# be signed. Our managed assemblies and kit artwork are not Mach-O and cannot
+# be. Apple's codesign seals them as resources anyway; rcodesign says outright
+# that it does not know how to, and leaves them out of CodeResources. The
+# result is a signature claiming to cover a bundle it does not match, which is
+# invalid — so Gatekeeper refuses it AND the kernel kills the process on
+# launch. An unsigned bundle merely gets complained about; an incorrectly
+# signed one does not run at all.
 #
-# which is unfixable from the Finder and reads, to anyone who sees it, like the
-# download is malware. 1.2.2 and earlier escaped it only because their main
-# executable was a shell script, so Gatekeeper judged the bundle as plain
-# unsigned code and took the softer path.
+# Signing this properly needs Apple's codesign, which needs a Mac. Until then
+# the bundles ship as .NET produces them: apphost ad-hoc signed by the SDK
+# (which is what lets it run on Apple silicon at all), dylibs signed by
+# Microsoft, no bundle seal.
 #
-# rcodesign is used rather than Apple's codesign because codesign is macOS
-# only and this builds on a PC. It re-signs every nested Mach-O, writes
-# CodeResources, and stamps the identifier from Info.plist.
-rcodesign=$(command -v rcodesign || true)
-[ -n "$rcodesign" ] || rcodesign=$(ls "$project"/.tools/*/rcodesign.exe 2>/dev/null | head -1 || true)
-
-if [ -z "$rcodesign" ]; then
-    echo "rcodesign not found, and shipping an unsealed bundle is what makes"
-    echo "macOS call the download damaged. Get it from"
-    echo "  https://github.com/indygreg/apple-platform-rs/releases"
-    echo "and put rcodesign.exe on PATH or in $project/.tools/<anything>/"
-    exit 1
-fi
-echo "==> Signing with $("$rcodesign" --version)"
+# The download being called damaged is handled instead by install.sh, which
+# fetches with curl. The quarantine flag is set by whatever does the
+# downloading, and curl does not set it, so Gatekeeper never assesses the app.
 
 echo "==> Cleaning"
 rm -rf "$out"
@@ -125,12 +118,9 @@ build() {
 
     cp "$here/README-mac.txt" "$out/$dir/README.txt"
 
-    # After the plist and the icon are in place: CodeResources seals the whole
-    # of Contents, so anything added afterwards would not be covered by it.
-    echo "==> Sealing $dir"
-    "$rcodesign" sign "$app" 2>&1 | grep -vE '^(signing|encountered|we do not|if the bundle)' || true
-
-    [ -f "$app/Contents/_CodeSignature/CodeResources" ]         || { echo "No CodeResources — the bundle did not seal, refusing to ship it"; exit 1; }
+    # Refuse to ship a partially sealed bundle. Nothing here writes one, but
+    # 1.2.3 did, and it produced an app the kernel killed on launch.
+    [ -d "$app/Contents/_CodeSignature" ]         && { echo "Bundle carries a code seal; without Apple's codesign it will be incomplete"; exit 1; }
 
     echo "==> Packing $tarball"
     (
