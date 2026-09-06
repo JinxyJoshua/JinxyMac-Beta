@@ -150,4 +150,27 @@ public class UpdaterTests
     {
         Assert.Equal("''", Updater.ShellQuote(""));
     }
+
+    /// <summary>
+    /// The launch check must observe the caller's token, not only its own
+    /// eight-second deadline. An already-cancelled token proves the linked
+    /// source is actually wired through to the request: without it the call
+    /// would go to the network and this would take a round trip instead of
+    /// returning at once.
+    /// </summary>
+    [Fact]
+    public async Task AnAlreadyCancelledTokenEndsTheCheckWithoutThrowing()
+    {
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        Available? found = await Updater.CheckAsync(cancelled.Token);
+        clock.Stop();
+
+        // Null, never an exception: a check that cannot run is not an error
+        // worth surfacing, and the caller is a fire-and-forget launch task.
+        Assert.Null(found);
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(2), $"took {clock.Elapsed}");
+    }
 }

@@ -53,6 +53,19 @@ public static class Updater
 
     private static readonly HttpClient Client = CreateClient();
 
+    /// <summary>How long the launch-time check may take before it is dropped.</summary>
+    /// <remarks>
+    /// The shared client's own timeout is fifteen minutes, which is right for
+    /// a hundred-megabyte download and badly wrong for a question. Nobody
+    /// asked for this check on launch, so it must never be what someone
+    /// notices about opening the app — and a stalled network without this
+    /// deadline does exactly that: the check hangs, and the offer window
+    /// finally appears minutes later, over whatever they moved on to. Given
+    /// up on rather than left hanging, matching the eight seconds the Windows
+    /// build allows its own launch check.
+    /// </remarks>
+    private static readonly TimeSpan CheckTimeout = TimeSpan.FromSeconds(8);
+
     private static HttpClient CreateClient()
     {
         var client = new HttpClient { Timeout = TimeSpan.FromMinutes(15) };
@@ -75,9 +88,15 @@ public static class Updater
     /// </remarks>
     public static async Task<Available?> CheckAsync(CancellationToken token = default)
     {
+        // Linked, not a bare CancelAfter: a caller's own token still has to
+        // cancel this, and the deadline is an extra reason to stop rather than
+        // a replacement for theirs.
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
+        deadline.CancelAfter(CheckTimeout);
+
         try
         {
-            string json = await Client.GetStringAsync(Feed, token).ConfigureAwait(false);
+            string json = await Client.GetStringAsync(Feed, deadline.Token).ConfigureAwait(false);
 
             using JsonDocument document = JsonDocument.Parse(json);
             JsonElement root = document.RootElement;
