@@ -35,7 +35,7 @@ public static class Updater
     /// build-mac.sh reads this and writes it into Info.plist, so the number in
     /// the bundle cannot drift from the number the updater compares against.
     /// </remarks>
-    public const string Version = "1.2.1";
+    public const string Version = "1.2.2";
 
     /// <summary>
     /// The repository this build updates from, and reads its config from.
