@@ -359,11 +359,15 @@
 
                             <Border Grid.Row="0" Grid.Column="0" Classes="card">
                                 <StackPanel>
-                                    <DockPanel LastChildFill="False">
-                                        <StackPanel VerticalAlignment="Center">
-                                            <TextBlock Text="KEYBIND" Classes="label"/>
-                                            <TextBlock Text="Starts and stops clicking" Classes="hint"/>
-                                        </StackPanel>
+                                    <!-- The button is declared FIRST and the text is the fill
+                                         child, in all three of these rows and in MODE below.
+                                         A DockPanel hands each child its width in declaration
+                                         order, so with the text first it took everything it
+                                         wanted and the button was left overlapping it — at the
+                                         1000px minimum width "Starts and stops clicking" ran
+                                         underneath "Not set". This way the button reserves its
+                                         width and the hint wraps into what is left. -->
+                                    <DockPanel>
                                         <Button Name="HotkeyButton" Content="Not set"
                                                 DockPanel.Dock="Right" VerticalAlignment="Center"
                                                 ToolTip.Tip="Click, then press a key"
@@ -371,15 +375,15 @@
                                                 Height="42" MinWidth="96" Padding="16,0"
                                                 HorizontalContentAlignment="Center"
                                                 VerticalContentAlignment="Center"/>
+                                        <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                                            <TextBlock Text="KEYBIND" Classes="label"/>
+                                            <TextBlock Text="Starts and stops clicking" Classes="hint"/>
+                                        </StackPanel>
                                     </DockPanel>
 
                                     <Separator Margin="0,12,0,10"/>
 
-                                    <DockPanel LastChildFill="False">
-                                        <StackPanel VerticalAlignment="Center">
-                                            <TextBlock Text="AUTOCLICKER + SHAKE" Classes="label"/>
-                                            <TextBlock Text="Starts and stops both together" Classes="hint"/>
-                                        </StackPanel>
+                                    <DockPanel>
                                         <Button Name="ComboHotkeyButton" Content="Not set"
                                                 DockPanel.Dock="Right" VerticalAlignment="Center"
                                                 ToolTip.Tip="Click, then press a key"
@@ -387,16 +391,15 @@
                                                 Height="42" MinWidth="96" Padding="16,0"
                                                 HorizontalContentAlignment="Center"
                                                 VerticalContentAlignment="Center"/>
+                                        <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                                            <TextBlock Text="AUTOCLICKER + SHAKE" Classes="label"/>
+                                            <TextBlock Text="Starts and stops both together" Classes="hint"/>
+                                        </StackPanel>
                                     </DockPanel>
 
                                     <Separator Margin="0,12,0,10"/>
 
-                                    <DockPanel LastChildFill="False">
-                                        <StackPanel VerticalAlignment="Center">
-                                            <TextBlock Text="BUILDING" Classes="label"/>
-                                            <TextBlock Name="BuildRateText" Classes="hint"
-                                                       Text="Fixed 35 CPS at 1% — Ignores the sliders"/>
-                                        </StackPanel>
+                                    <DockPanel>
                                         <Button Name="BuildHotkeyButton" Content="Not set"
                                                 DockPanel.Dock="Right" VerticalAlignment="Center"
                                                 ToolTip.Tip="Click, then press a key"
@@ -404,6 +407,11 @@
                                                 Height="42" MinWidth="96" Padding="16,0"
                                                 HorizontalContentAlignment="Center"
                                                 VerticalContentAlignment="Center"/>
+                                        <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                                            <TextBlock Text="BUILDING" Classes="label"/>
+                                            <TextBlock Name="BuildRateText" Classes="hint"
+                                                       Text="Fixed 35 CPS at 1% — Ignores the sliders"/>
+                                        </StackPanel>
                                     </DockPanel>
 
                                     <TextBlock Name="HotkeyNoticeText" Classes="hint" IsVisible="False"
@@ -436,11 +444,7 @@
 
                             <Border Grid.Row="1" Grid.Column="0" Classes="card">
                                 <StackPanel>
-                                    <DockPanel LastChildFill="False">
-                                        <StackPanel VerticalAlignment="Center">
-                                            <TextBlock Text="MODE" Classes="label"/>
-                                            <TextBlock Text="Hold the key, or press to latch" Classes="hint"/>
-                                        </StackPanel>
+                                    <DockPanel>
                                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
                                                     VerticalAlignment="Center">
                                             <RadioButton Name="HoldModeButton" GroupName="ClickMode"
@@ -448,6 +452,10 @@
                                             <RadioButton Name="ToggleModeButton" GroupName="ClickMode"
                                                          Classes="segment" Content="Toggle"
                                                          IsChecked="True" Margin="0"/>
+                                        </StackPanel>
+                                        <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                                            <TextBlock Text="MODE" Classes="label"/>
+                                            <TextBlock Text="Hold the key, or press to latch" Classes="hint"/>
                                         </StackPanel>
                                     </DockPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,14,0,0" Spacing="8">
@@ -1521,17 +1529,22 @@
                                      own Disable button was pressed — same treatment a
                                      macro card gives itself, one card rather than many. -->
                                 <StackPanel Name="SwitcherCardBody">
-                                    <DockPanel LastChildFill="False">
-                                        <StackPanel VerticalAlignment="Center">
-                                            <TextBlock Text="AUTO SWITCHER" Classes="label"/>
-                                            <TextBlock Classes="hint" TextWrapping="Wrap"
-                                                       Text="Swaps between two hotbar slots on a timer — sword and crossbow, or pickaxe and gumdrop."/>
-                                        </StackPanel>
+                                    <!-- Docked children first, text last, for the reason given on
+                                         the Clicker page's keybind rows: this hint is the longest
+                                         one sharing a row with a control and at the minimum width
+                                         it came within 40px of the Disable button. The checkbox is
+                                         declared before the button so it ends up furthest right. -->
+                                    <DockPanel>
                                         <CheckBox Name="SwitcherEnabled" DockPanel.Dock="Right" Margin="0"
                                                   VerticalAlignment="Center"/>
                                         <Button Name="SwitcherDisableButton" DockPanel.Dock="Right"
                                                 Content="Disable" Padding="12,0" Height="30" MinWidth="86"
                                                 Margin="0,0,12,0" FontSize="11" VerticalAlignment="Center"/>
+                                        <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                                            <TextBlock Text="AUTO SWITCHER" Classes="label"/>
+                                            <TextBlock Classes="hint" TextWrapping="Wrap"
+                                                       Text="Swaps between two hotbar slots on a timer — sword and crossbow, or pickaxe and gumdrop."/>
+                                        </StackPanel>
                                     </DockPanel>
 
                                     <Grid Margin="0,16,0,0"
