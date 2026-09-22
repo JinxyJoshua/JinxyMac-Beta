@@ -78,6 +78,19 @@ mkdir -p "$out"
 # The version is written once, in Updater.cs, and stamped into the plist here.
 # Kept in both places by hand they drift, and the first symptom of that is an
 # updater cheerfully offering the version already installed, for ever.
+# Read from the plist rather than typed again here, so the signing identifier
+# and CFBundleIdentifier cannot drift apart - that drift is the bug the signing
+# step below exists to fix.
+bundle_id=$(grep -A1 '<key>CFBundleIdentifier</key>' "$here/Info.plist" | grep -oE '<string>[^<]+' | sed 's/<string>//')
+[ -n "$bundle_id" ] || { echo "Could not read CFBundleIdentifier out of Info.plist"; exit 1; }
+
+# Used only to rename the apphost's signature (see build()), never to seal the
+# bundle. Get it from https://github.com/indygreg/apple-platform-rs/releases
+# and put rcodesign.exe on PATH or in .tools/<anything>/.
+rcodesign=$(command -v rcodesign || true)
+[ -n "$rcodesign" ] || rcodesign=$(ls "$project"/.tools/*/rcodesign.exe 2>/dev/null | head -1 || true)
+[ -n "$rcodesign" ] || { echo "rcodesign not found - needed to set the signing identifier"; exit 1; }
+
 version=$(grep -oE 'Version = "[0-9.]+"' "$project/Core/Updater.cs" | grep -oE '[0-9.]+')
 [ -n "$version" ] || { echo "Could not read the version out of Updater.cs"; exit 1; }
 echo "    version $version"
@@ -108,6 +121,19 @@ build() {
     # Neither means anything on macOS and together they are a few megabytes of
     # a download that is already large.
     rm -f "$app/Contents/MacOS"/*.pdb
+
+    # The apphost comes out of the SDK ad-hoc signed under the identifier
+    # "apphost" - the same name for every .NET app. macOS files an
+    # Accessibility grant under the app's CFBundleIdentifier, then checks the
+    # signing identifier of the process asking. "apphost" matches nothing, so
+    # the grant never applied: the app said BLOCKED however often the box was
+    # ticked. (confidence: moderate - this was the one combination not yet
+    # tried on a Mac when it was written.)
+    #
+    # Only the identifier changes. The binary alone is re-signed: no bundle
+    # seal is written, because that is what made 1.2.3 unlaunchable, and the
+    # signature keeps the same two special slots the SDK gave it.
+    "$rcodesign" sign --binary-identifier "$bundle_id" "$app/Contents/MacOS/JinxyMac" >/dev/null 2>&1         || { echo "Could not set the signing identifier on $dir"; exit 1; }
 
     [ -f "$app/Contents/MacOS/JinxyMac" ] \
         || { echo "No apphost at Contents/MacOS/JinxyMac — the bundle would be inert"; exit 1; }
