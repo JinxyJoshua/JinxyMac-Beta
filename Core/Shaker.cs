@@ -97,6 +97,10 @@ public sealed class Shaker : IDisposable
 
     private void Loop(CancellationToken token)
     {
+        // Its moves share the input gate with the clicks, so a slow shake
+        // thread holding that gate would delay them. No-op off macOS.
+        MacScheduling.MakeCurrentThreadInteractive();
+
         int offsetX = 0, offsetY = 0;
 
         try

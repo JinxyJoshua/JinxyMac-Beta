@@ -86,6 +86,11 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
+        // Before anything else runs. Jinxy's window is behind the game whenever
+        // it is in use, so to macOS it always looks idle, and App Nap would
+        // throttle the timers every click depends on. See Engine/MacScheduling.
+        MacScheduling.KeepAppAwake();
+
         // Real state up front rather than the field's default false: a
         // window can already be active by the time this constructor runs
         // (Avalonia activates the first window before it is shown on some

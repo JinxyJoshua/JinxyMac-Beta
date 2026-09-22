@@ -330,15 +330,19 @@ public sealed class MacroRunner : IDisposable
 
         CancellationToken token = cts.Token;
 
-        new Thread(() => Loop(macro, token))
+        var thread = new Thread(() => Loop(macro, token))
         {
             IsBackground = true,
-            // Matched to the click engine. At default priority this thread was
-            // descheduled under load, which made its sleeps overrun, which made
-            // it spin longer to catch up — the stutter fed itself.
-            Priority = ThreadPriority.AboveNormal,
             Name = "Macro:" + macro.Name
-        }.Start();
+        };
+
+        // Matched to the click engine. At default priority this thread was
+        // descheduled under load, which made its sleeps overrun, which made it
+        // spin longer to catch up — the stutter fed itself. Windows only: on
+        // the Mac the QoS class set at the top of Loop is what does this.
+        if (MacScheduling.SetsWindowsThreadPriority) thread.Priority = ThreadPriority.AboveNormal;
+
+        thread.Start();
 
         Changed?.Invoke();
     }
@@ -381,6 +385,9 @@ public sealed class MacroRunner : IDisposable
 
     private void Loop(KeyMacro macro, CancellationToken token)
     {
+        // Same as the click loop: on the performance cores. No-op off macOS.
+        MacScheduling.MakeCurrentThreadInteractive();
+
         int at = 0;
 
         // The one key that might still be down mid-send. SendGated always

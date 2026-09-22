@@ -77,9 +77,13 @@ public sealed class Clicker : IDisposable
         _thread = new Thread(() => Loop(token))
         {
             IsBackground = true,
-            Priority = ThreadPriority.AboveNormal,
             Name = "ClickEngine"
         };
+
+        // Windows only. On the Mac the thread's QoS class does this job, set at
+        // the top of Loop, and a priority set here can make macOS refuse it.
+        if (MacScheduling.SetsWindowsThreadPriority) _thread.Priority = ThreadPriority.AboveNormal;
+
         _thread.Start();
     }
 
@@ -92,6 +96,10 @@ public sealed class Clicker : IDisposable
 
     private void Loop(CancellationToken token)
     {
+        // On the performance cores, so a covered window does not cost clicks.
+        // A no-op off macOS.
+        MacScheduling.MakeCurrentThreadInteractive();
+
         // The button actually pressed, which is not necessarily the one
         // selected now. A release naming a different button leaves the pressed
         // one down across the whole desktop with nothing to release it.

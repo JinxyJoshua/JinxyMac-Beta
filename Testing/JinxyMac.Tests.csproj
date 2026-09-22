@@ -68,6 +68,8 @@
     <Compile Include="../Core/Shaker.Tests.cs" />
     <Compile Include="../Engine/IClickEngine.cs" />
     <Compile Include="../Engine/IKeyEngine.cs" />
+    <Compile Include="../Engine/MacScheduling.cs" />
+    <Compile Include="../Engine/MacScheduling.Tests.cs" />
     <Compile Include="../Core/KitWheel.cs" />
     <Compile Include="../Core/KitWheel.Tests.cs" />
     <Compile Include="../Core/KitImages.cs" />
