@@ -234,6 +234,7 @@
                     <RadioButton Classes="nav" GroupName="Nav" Content="Auto Switcher" Name="NavSwitcher"/>
                     <RadioButton Classes="nav" GroupName="Nav" Content="Recorder" Name="NavRecorder"/>
                     <RadioButton Classes="nav" GroupName="Nav" Content="Kit Wheel" Name="NavKitWheel"/>
+                    <RadioButton Classes="nav" GroupName="Nav" Content="Crosshair" Name="NavCrosshair"/>
                     <RadioButton Classes="nav" GroupName="Nav" Content="History" Name="NavHistory"/>
                     <RadioButton Classes="nav" GroupName="Nav" Content="Theme" Name="NavTheme"/>
                     <RadioButton Classes="nav" GroupName="Nav" Content="Settings" Name="NavSettings"/>
@@ -854,6 +855,121 @@
                     </StackPanel>
 
                     <!-- History -->
+                    <!-- Crosshair: written into Roblox's own cursor pictures, not
+                         drawn over the game. See MainWindow.Crosshair.cs. -->
+                    <StackPanel Name="PageCrosshair" IsVisible="False">
+
+                        <Border Classes="card">
+                            <Grid ColumnDefinitions="*,190">
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="IN-GAME CROSSHAIR" Classes="label"/>
+                                    <!-- Left, not the default: a MaxWidth narrower than the
+                                         column leaves Avalonia centring the block, which
+                                         indents the text away from the label above it. -->
+                                    <TextBlock Classes="hint" TextWrapping="Wrap" MaxWidth="560"
+                                               HorizontalAlignment="Left"
+                                               Text="Puts a crosshair in place of Roblox's mouse cursor, so it is the real cursor you aim with - first person included. Fully reversible: Remove puts Roblox's own cursors back."/>
+
+                                    <TextBlock Name="CrosshairStatus" Classes="hint" TextWrapping="Wrap"
+                                               Margin="0,12,0,0" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource Accent}"
+                                               Text="Pick a crosshair below, then Apply to Roblox."/>
+
+                                    <Grid Name="CrosshairSizeRow" ColumnDefinitions="52,*,54" Margin="0,14,0,0">
+                                        <TextBlock Grid.Column="0" Text="SIZE" Classes="tiny"
+                                                   VerticalAlignment="Center"/>
+                                        <Slider Grid.Column="1" Name="CrosshairSizeSlider"
+                                                Minimum="40" Maximum="160" Value="100"
+                                                TickFrequency="5" IsSnapToTickEnabled="True"
+                                                VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="2" Name="CrosshairSizeValue" Text="100%"
+                                                   Classes="value" FontSize="13"
+                                                   HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                    </Grid>
+
+                                    <StackPanel Orientation="Horizontal" Margin="0,16,0,0" Spacing="10">
+                                        <Button Name="CrosshairApplyButton" Classes="accent"
+                                                Content="Apply to Roblox" Height="38" MinWidth="150"
+                                                Padding="16,0"/>
+                                        <Button Name="CrosshairRemoveButton" Content="Remove"
+                                                Height="38" MinWidth="96" Padding="16,0"/>
+                                        <Button Name="CrosshairImportButton" Content="Import picture..."
+                                                Height="38" Padding="16,0"/>
+                                    </StackPanel>
+
+                                    <TextBlock Classes="hint" Margin="0,10,0,0"
+                                               Text="Roblox only reads its cursor when it starts, so quit Roblox and open it again after applying."/>
+                                </StackPanel>
+
+                                <Border Grid.Column="1" CornerRadius="8" Margin="16,0,0,0" MinHeight="168"
+                                        Background="{DynamicResource Sunken}"
+                                        BorderBrush="{DynamicResource Divider}" BorderThickness="1">
+                                    <Image Name="CrosshairPreviewImage" Width="132" Height="132"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                           Stretch="Uniform"/>
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                        <Border Classes="card">
+                            <StackPanel>
+                                <TextBlock Text="GALLERY" Classes="label"/>
+                                <TextBlock Classes="hint" Margin="0,4,0,0"
+                                           Text="Tap one to preview it, then Apply to Roblox. The first tile is Roblox's own cursor - apply that to put everything back."/>
+                                <WrapPanel Name="CrosshairGalleryPanel" Margin="0,12,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card">
+                            <Grid ColumnDefinitions="*,140">
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="MAKE YOUR OWN" Classes="label"/>
+                                    <TextBlock Classes="hint" Margin="0,4,0,0"
+                                               Text="Pick a shape and two colours, then add it to the gallery."/>
+
+                                    <TextBlock Text="SHAPE" Classes="tiny" Margin="0,12,0,6"/>
+                                    <WrapPanel Name="CrosshairShapePanel">
+                                        <RadioButton Classes="segment" GroupName="CrosshairShape" Tag="Cross"
+                                                     Content="Cross" IsChecked="True"/>
+                                        <RadioButton Classes="segment" GroupName="CrosshairShape" Tag="CrossDot"
+                                                     Content="Cross + Dot"/>
+                                        <RadioButton Classes="segment" GroupName="CrosshairShape" Tag="X"
+                                                     Content="X"/>
+                                        <RadioButton Classes="segment" GroupName="CrosshairShape" Tag="XDot"
+                                                     Content="X + Dot"/>
+                                        <RadioButton Classes="segment" GroupName="CrosshairShape" Tag="Dot"
+                                                     Content="Dot"/>
+                                        <RadioButton Classes="segment" GroupName="CrosshairShape" Tag="Circle"
+                                                     Content="Ring"/>
+                                        <RadioButton Classes="segment" GroupName="CrosshairShape" Tag="CircleDot"
+                                                     Content="Ring + Dot"/>
+                                        <RadioButton Classes="segment" GroupName="CrosshairShape" Tag="TShape"
+                                                     Content="T"/>
+                                    </WrapPanel>
+
+                                    <TextBlock Text="COLOUR" Classes="tiny" Margin="0,14,0,6"/>
+                                    <WrapPanel Name="CrosshairColorPanel"/>
+
+                                    <TextBlock Text="CENTRE" Classes="tiny" Margin="0,8,0,6"/>
+                                    <WrapPanel Name="CrosshairDotColorPanel"/>
+
+                                    <Button Name="CrosshairAddButton" Content="Add to gallery"
+                                            Height="36" Padding="16,0" Margin="0,14,0,0"
+                                            HorizontalAlignment="Left"/>
+                                </StackPanel>
+
+                                <Border Grid.Column="1" CornerRadius="8" Margin="16,0,0,0" MinHeight="120"
+                                        Background="{DynamicResource Sunken}"
+                                        BorderBrush="{DynamicResource Divider}" BorderThickness="1">
+                                    <Image Name="CrosshairBuilderPreview" Width="88" Height="88"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                           Stretch="Uniform"/>
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                    </StackPanel>
+
                     <StackPanel Name="PageHistory" IsVisible="False">
                         <Grid ColumnDefinitions="*,12,*,12,*,12,*" Margin="0,0,0,14">
                             <Border Grid.Column="0" Classes="tile">

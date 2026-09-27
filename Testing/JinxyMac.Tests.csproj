@@ -21,6 +21,7 @@
     <Compile Include="../Core/RobloxCursors.Tests.cs" />
     <Compile Include="../CrosshairImage.cs" />
     <Compile Include="../CrosshairImage.Tests.cs" />
+    <Compile Include="../CrosshairStore.cs" />
     <Compile Include="../Core/ClickTiming.cs" />
     <Compile Include="../Core/ClickTiming.Tests.cs" />
     <Compile Include="../Core/ClickOutput.cs" />

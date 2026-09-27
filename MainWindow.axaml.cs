@@ -164,6 +164,7 @@ public partial class MainWindow : Window
         WireHistory();
         WirePresets();
         WireKitWheel();
+        WireCrosshair();
         WireMacros();
         WireSwitcher();
         WireMacroBadge();
@@ -258,6 +259,7 @@ public partial class MainWindow : Window
         Wire(NavSwitcher, PageSwitcher, "Auto Switcher", "Swap between two hotbar slots");
         Wire(NavRecorder, PageRecorder, "Recorder", "Screen capture, hardware encoded");
         Wire(NavKitWheel, PageKitWheel, "Kit Wheel", "Roll a kit you have not played yet");
+        Wire(NavCrosshair, PageCrosshair, "Crosshair", "A crosshair in place of Roblox's cursor");
         Wire(NavHistory, PageHistory, "History", "Time spent clicking, and how much of it landed");
         Wire(NavTheme, PageTheme, "Theme", "Accent colour");
         Wire(NavSettings, PageSettings, "Settings", "Where things are stored, and what this build can do");
@@ -278,6 +280,7 @@ public partial class MainWindow : Window
         PageTheme.IsVisible = ReferenceEquals(page, PageTheme);
         PageSettings.IsVisible = ReferenceEquals(page, PageSettings);
         PageKitWheel.IsVisible = ReferenceEquals(page, PageKitWheel);
+        PageCrosshair.IsVisible = ReferenceEquals(page, PageCrosshair);
         PageMacros.IsVisible = ReferenceEquals(page, PageMacros);
         PageSwitcher.IsVisible = ReferenceEquals(page, PageSwitcher);
 
@@ -1217,6 +1220,8 @@ public partial class MainWindow : Window
     private void ApplySettings()
     {
         _loading = true;
+
+        LoadCrosshair(_settings);
 
         // Clamped to the minimums the window declares. A stored size from a
         // larger monitor is only a problem if it is honoured blindly, and a

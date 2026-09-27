@@ -29,6 +29,19 @@ public static class CrosshairGallery
     private const string White = "#FFFFFF";
     private const string Black = "#111111";
 
+    /// <summary>The palette offered when building your own, name and hex.</summary>
+    /// <remarks>
+    /// The same colours the ready-made entries are built from, so a crosshair
+    /// someone makes sits beside them rather than looking like it came from
+    /// somewhere else.
+    /// </remarks>
+    public static IReadOnlyList<(string Name, string Hex)> Palette { get; } = new[]
+    {
+        ("Green", Green), ("Cyan", Cyan), ("Sky", Sky), ("Red", Red),
+        ("Crimson", Crimson), ("Pink", Pink), ("Yellow", Yellow), ("Orange", Orange),
+        ("Purple", Purple), ("Violet", Violet), ("White", White), ("Black", Black)
+    };
+
     public static IReadOnlyList<(string Name, CrosshairStyle Style)> All { get; } =
         new (string, CrosshairStyle)[]
     {

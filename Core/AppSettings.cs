@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text.Json;
 
 namespace JinxyMac.Core;
@@ -142,6 +143,26 @@ public sealed class AppSettings
 
     /// <summary>Look for a newer build when the app opens.</summary>
     public bool AutoCheckUpdates { get; set; } = true;
+
+    /// <summary>The crosshair chosen on the Crosshair page.</summary>
+    /// <remarks>
+    /// The name rather than a position in the gallery, so reordering the gallery
+    /// or adding one of your own cannot silently change which crosshair a
+    /// settings file means. Whether it is currently written into Roblox's cursor
+    /// files is read from those files, not from here.
+    /// </remarks>
+    public string CrosshairName { get; set; } = "Green Cross";
+
+    /// <summary>Each crosshair's own size, as a percentage, by name.</summary>
+    /// <remarks>
+    /// Per crosshair rather than one setting: a dot and a sniper cross want very
+    /// different sizes, and switching between them should not mean setting the
+    /// slider again every time.
+    /// </remarks>
+    public Dictionary<string, int> CrosshairSizes { get; set; } = new();
+
+    /// <summary>Crosshairs the user built or imported, shown after the ready-made ones.</summary>
+    public List<CustomCrosshair> CustomCrosshairs { get; set; } = new();
 
     public double? WindowWidth { get; set; }
     public double? WindowHeight { get; set; }
