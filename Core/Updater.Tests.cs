@@ -176,7 +176,12 @@ public class UpdaterTests
         // Null, never an exception: a check that cannot run is not an error
         // worth surfacing, and the caller is a fire-and-forget launch task.
         Assert.Null(found);
-        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(2), $"took {clock.Elapsed}");
+
+        // Five seconds, not two: this failed once on a machine that was busy
+        // building, and a test that cries wolf under load teaches people to
+        // ignore it. Well under the eight-second check timeout either way, so
+        // it still proves the request was never made.
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(5), $"took {clock.Elapsed}");
     }
 
     // ---- picking the tarball for this Mac ----
@@ -234,5 +239,88 @@ public class UpdaterTests
         Assert.True(
             string.CompareOrdinal("JinxyMac-mac.tar.gz", "JinxyMac-mac-intel.tar.gz") > 0,
             "a hyphen would put the Intel build first again");
+    }
+
+    /// <summary>
+    /// Since 1.2.6 there is a build for Macs too old for the ordinary one
+    /// (below macOS 12). A modern Mac must never be offered it: updating would
+    /// quietly move it onto an older runtime.
+    /// </summary>
+    [Theory]
+    [InlineData("JinxyMac-mac_older.tar.gz")]
+    [InlineData("JinxyMac-mac_older_intel.tar.gz")]
+    public void AModernMacIsNeverOfferedTheOlderMacOsBuild(string asset)
+    {
+        if (Updater.NeedsOlderMacBuild) return;
+
+        Assert.False(Updater.IsForThisMac(asset));
+    }
+
+    /// <summary>
+    /// And the reverse, which is the one that would strand someone: a Mac below
+    /// macOS 12 must not be offered the ordinary build, because macOS refuses
+    /// to open it and the update would leave them with an app that will not
+    /// start.
+    /// </summary>
+    [Theory]
+    [InlineData("JinxyMac-mac.tar.gz")]
+    [InlineData("JinxyMac-mac_intel.tar.gz")]
+    public void AnOldMacIsNeverOfferedTheOrdinaryBuild(string asset)
+    {
+        if (!Updater.NeedsOlderMacBuild) return;
+
+        Assert.False(Updater.IsForThisMac(asset));
+    }
+
+    /// <summary>
+    /// Every combination of Mac and asset, which is what decides whether an
+    /// update helps someone or strands them. Each Mac has exactly one right
+    /// answer out of the four downloads.
+    /// </summary>
+    [Theory]
+    // A modern Apple silicon Mac.
+    [InlineData("JinxyMac-mac.tar.gz", false, false, true)]
+    [InlineData("JinxyMac-mac_intel.tar.gz", false, false, false)]
+    [InlineData("JinxyMac-mac_older.tar.gz", false, false, false)]
+    [InlineData("JinxyMac-mac_older_intel.tar.gz", false, false, false)]
+    // A modern Intel Mac.
+    [InlineData("JinxyMac-mac.tar.gz", false, true, false)]
+    [InlineData("JinxyMac-mac_intel.tar.gz", false, true, true)]
+    [InlineData("JinxyMac-mac_older.tar.gz", false, true, false)]
+    [InlineData("JinxyMac-mac_older_intel.tar.gz", false, true, false)]
+    // An Intel Mac on Big Sur, the one this was built for.
+    [InlineData("JinxyMac-mac.tar.gz", true, true, false)]
+    [InlineData("JinxyMac-mac_intel.tar.gz", true, true, false)]
+    [InlineData("JinxyMac-mac_older.tar.gz", true, true, false)]
+    [InlineData("JinxyMac-mac_older_intel.tar.gz", true, true, true)]
+    // An Apple silicon Mac still on Big Sur, which is where an M1 shipped.
+    [InlineData("JinxyMac-mac.tar.gz", true, false, false)]
+    [InlineData("JinxyMac-mac_intel.tar.gz", true, false, false)]
+    [InlineData("JinxyMac-mac_older.tar.gz", true, false, true)]
+    [InlineData("JinxyMac-mac_older_intel.tar.gz", true, false, false)]
+    public void EachMacHasExactlyOneRightDownload(string asset, bool oldMac, bool x64, bool expected)
+    {
+        Assert.Equal(expected, Updater.Matches(asset, oldMac, x64));
+    }
+
+    /// <summary>
+    /// Asset order still has to put the ordinary Apple silicon build first, for
+    /// the 1.0.8 and 1.2.2 clients that take whichever tarball they see first.
+    /// </summary>
+    [Fact]
+    public void TheOrdinaryAppleSiliconBuildStillSortsFirst()
+    {
+        string[] assets =
+        {
+            "JinxyMac-mac.tar.gz",
+            "JinxyMac-mac_intel.tar.gz",
+            "JinxyMac-mac_older.tar.gz",
+            "JinxyMac-mac_older_intel.tar.gz"
+        };
+
+        string[] sorted = (string[])assets.Clone();
+        Array.Sort(sorted, StringComparer.Ordinal);
+
+        Assert.Equal("JinxyMac-mac.tar.gz", sorted[0]);
     }
 }

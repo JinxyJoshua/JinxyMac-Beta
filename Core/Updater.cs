@@ -36,7 +36,7 @@ public static class Updater
     /// build-mac.sh reads this and writes it into Info.plist, so the number in
     /// the bundle cannot drift from the number the updater compares against.
     /// </remarks>
-    public const string Version = "1.2.5";
+    public const string Version = "1.2.6";
 
     /// <summary>
     /// The repository this build updates from, and reads its config from.
@@ -168,12 +168,51 @@ public static class Updater
     /// its word is right: it should be offered the x64 build it is already
     /// running, not moved to a different architecture by an update.
     /// </remarks>
-    internal static bool IsForThisMac(string assetName)
+    internal static bool IsForThisMac(string assetName) => Matches(
+        assetName,
+        NeedsOlderMacBuild,
+        RuntimeInformation.ProcessArchitecture == Architecture.X64);
+
+    /// <summary>
+    /// The rule itself, with the machine's answers passed in.
+    /// </summary>
+    /// <remarks>
+    /// Split from <see cref="IsForThisMac"/> so every combination can be tested
+    /// on any machine. Read from the environment, three of the four cases are
+    /// untestable from wherever the test happens to run — and the case that
+    /// matters most is the one no developer machine is in: an old Mac being
+    /// offered a build it cannot open.
+    /// </remarks>
+    internal static bool Matches(string assetName, bool needsOlderMac, bool x64)
     {
         bool intel = assetName.Contains("intel", StringComparison.OrdinalIgnoreCase);
+        bool older = assetName.Contains("older", StringComparison.OrdinalIgnoreCase);
 
-        return RuntimeInformation.ProcessArchitecture == Architecture.X64 ? intel : !intel;
+        // The older-macOS builds are not a fallback, they are a different
+        // answer: a Mac below macOS 12 must take one and a Mac at or above it
+        // must not. Offering the ordinary build to a Mac that cannot run it
+        // would replace a working app with one macOS refuses to open, and
+        // offering the older build to a modern Mac would quietly move it onto
+        // an older runtime.
+        return (x64 ? intel : !intel) && (needsOlderMac ? older : !older);
     }
+
+    /// <summary>
+    /// Whether this Mac is too old for the ordinary build.
+    /// </summary>
+    /// <remarks>
+    /// The ordinary build is .NET 10, whose runtime records a minimum of macOS
+    /// 12; the older build is .NET 8, which goes back to 10.15. Both numbers
+    /// were read out of the shipped binaries rather than taken from
+    /// documentation, which lists only the macOS versions Apple still supports
+    /// and so says nothing about what will run.
+    ///
+    /// <c>IsMacOSVersionAtLeast</c> rather than <c>Environment.OSVersion</c>:
+    /// this is the API that answers about macOS itself rather than the kernel
+    /// underneath it.
+    /// </remarks>
+    internal static bool NeedsOlderMacBuild =>
+        OperatingSystem.IsMacOS() && !OperatingSystem.IsMacOSVersionAtLeast(12);
 
     /// <summary>
     /// Compares two dotted versions numerically.

@@ -101,6 +101,8 @@ build() {
     dir=$2
     tarball=$3
     label=$4
+    framework=$5
+    minos=$6
 
     app="$out/$dir/JinxyMac.app"
 
@@ -112,6 +114,7 @@ build() {
     # what macOS matches the process against. Nothing between them.
     dotnet publish "$project/JinxyMac.csproj" \
         --configuration Release \
+        --framework "$framework" \
         --runtime "$rid" \
         --self-contained true \
         --output "$app/Contents/MacOS" \
@@ -138,8 +141,18 @@ build() {
     [ -f "$app/Contents/MacOS/JinxyMac" ] \
         || { echo "No apphost at Contents/MacOS/JinxyMac — the bundle would be inert"; exit 1; }
 
-    sed "s|<string>1\.0\.0</string>|<string>$version</string>|g" \
-        "$here/Info.plist" > "$app/Contents/Info.plist"
+    # The version, and the minimum macOS this particular build can run on. The
+    # minimum differs per build and is read from the runtime's own binaries, not
+    # guessed: .NET 10 records macOS 12, .NET 8 records 10.15, and Avalonia's
+    # arm64 native library records 11. Claiming lower than the truth turns a
+    # clear "your macOS is too old" into an unreadable dyld crash at launch.
+    sed -e "s|<string>1\.0\.0</string>|<string>$version</string>|g" \
+        -e "s|<key>LSMinimumSystemVersion</key>|<key>LSMinimumSystemVersion</key>|" \
+        "$here/Info.plist" \
+        | awk -v minos="$minos" '
+            /<key>LSMinimumSystemVersion<\/key>/ { print; getline; sub(/>[0-9.]+</, ">" minos "<"); print; next }
+            { print }
+          ' > "$app/Contents/Info.plist"
     cp "$here/JinxyMac.icns" "$app/Contents/Resources/JinxyMac.icns"
 
     cp "$here/README-mac.txt" "$out/$dir/README.txt"
@@ -164,8 +177,19 @@ build() {
     echo "    $(du -sh "$app" | cut -f1) bundle -> $out/$tarball ($(du -h "$out/$tarball" | cut -f1))"
 }
 
-build osx-arm64 applesilicon JinxyMac-mac.tar.gz "Apple silicon"
-build osx-x64   intel        JinxyMac-mac_intel.tar.gz "Intel"
+# Four downloads: two architectures, and for each one an ordinary build and a
+# build for Macs too old to run it.
+#
+# The ordinary builds are .NET 10, whose runtime cannot start below macOS 12.
+# That left anyone on Big Sur or Catalina with an app macOS refuses to open, so
+# the older builds are .NET 8 — still a supported release, and its runtime goes
+# back to 10.15. The arm64 pair stops at 11 rather than 10.15 because Avalonia's
+# arm64 native library does, and because no Apple silicon Mac ever ran anything
+# older.
+build osx-arm64 applesilicon JinxyMac-mac.tar.gz             "Apple silicon"              net10.0 12.0
+build osx-x64   intel        JinxyMac-mac_intel.tar.gz       "Intel"                      net10.0 12.0
+build osx-arm64 olderarm     JinxyMac-mac_older.tar.gz       "Apple silicon, older macOS" net8.0  11.0
+build osx-x64   olderintel   JinxyMac-mac_older_intel.tar.gz "Intel, older macOS"         net8.0  10.15
 
 echo
 echo "Done. Upload JinxyMac-mac.tar.gz FIRST — see Core/Updater.cs on why order matters."

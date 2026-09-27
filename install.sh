@@ -32,18 +32,40 @@ if [ "$(uname -s)" != "Darwin" ]; then
     exit 1
 fi
 
+# Two things decide the download: the chip, and whether macOS is new enough for
+# the ordinary build. The ordinary builds are .NET 10, which cannot start below
+# macOS 12; the "older" ones are .NET 8 and go back to 10.15. Picking wrongly
+# here gives someone an app macOS simply refuses to open.
+major=$(sw_vers -productVersion 2>/dev/null | cut -d. -f1)
+[ -n "$major" ] || major=12
+
+if [ "$major" -lt 12 ]; then
+    older="_older"
+    note=" (build for older macOS)"
+else
+    older=""
+    note=""
+fi
+
 case "$(uname -m)" in
-    arm64) asset=JinxyMac-mac.tar.gz;       flavour="Apple silicon" ;;
-    x86_64) asset=JinxyMac-mac_intel.tar.gz; flavour="Intel" ;;
+    arm64) asset="JinxyMac-mac${older}.tar.gz";        flavour="Apple silicon" ;;
+    x86_64) asset="JinxyMac-mac${older}_intel.tar.gz"; flavour="Intel" ;;
     *) echo "Unknown architecture: $(uname -m)"; exit 1 ;;
 esac
+
+# Below 10.15 nothing here runs, and saying so beats downloading 50 MB to find
+# out.
+if [ "$major" -lt 11 ] && [ "$(sw_vers -productVersion | cut -d. -f2)" -lt 15 ]; then
+    echo "This needs macOS 10.15 or later. You have $(sw_vers -productVersion)."
+    exit 1
+fi
 
 url="https://github.com/JinxyJoshua/JinxyMac-Beta/releases/latest/download/$asset"
 work=$(mktemp -d)
 # Leaves nothing behind, including when the download fails half way.
 trap 'rm -rf "$work"' EXIT INT TERM
 
-echo "Jinxy AutoClicker — $flavour build"
+echo "Jinxy AutoClicker — $flavour build$note"
 echo "Downloading (about 50 MB)…"
 curl -fL --progress-bar -o "$work/jinxy.tar.gz" "$url"
 
