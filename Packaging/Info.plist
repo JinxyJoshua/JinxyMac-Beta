@@ -41,12 +41,21 @@
     <string>6.0</string>
 
     <!--
-        Every Mac .NET 10 supports. Set lower and the app launches on a system
-        the runtime cannot start on, which fails as an unreadable dyld error
-        instead of a sentence from the system saying the OS is too old.
+        The lowest macOS everything in the bundle can actually run on, not a
+        guess. Read out of the binaries themselves: every .NET 10 library
+        records a minimum of macOS 12.0, and Avalonia's and Skia's go back
+        further still (11.0 and 10.9), so 12.0 is the real floor and the
+        runtime is what sets it.
+
+        This said 13.0 until 1.2.6, which turned away Monterey users the app
+        would have run on perfectly well. Set it LOWER than the true floor and
+        the app launches on a system the runtime cannot start on, which fails as
+        an unreadable dyld error instead of a sentence from the system saying
+        the OS is too old - so this number should be checked against the
+        binaries after a .NET upgrade, not carried forward.
     -->
     <key>LSMinimumSystemVersion</key>
-    <string>13.0</string>
+    <string>12.0</string>
 
     <key>NSHighResolutionCapable</key>
     <true/>

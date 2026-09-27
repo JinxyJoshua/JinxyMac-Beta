@@ -1,7 +1,7 @@
 Jinxy AutoClicker — Mac
 =======================
 
-Runs on macOS 13 or later. Nothing to install; the app carries everything
+Runs on macOS 12 (Monterey) or later. Nothing to install; the app carries everything
 it needs.
 
 There are two downloads and they are not interchangeable:
