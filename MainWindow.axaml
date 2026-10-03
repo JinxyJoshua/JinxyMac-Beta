@@ -1261,6 +1261,21 @@
                         <Border Classes="card">
                             <StackPanel>
                                 <DockPanel LastChildFill="False">
+                                    <TextBlock Text="DIAGNOSTICS" Foreground="{DynamicResource TextMuted}"
+                                               FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <Button Name="CopyDiagnosticsButton" DockPanel.Dock="Right"
+                                            Content="Copy" Padding="14,6" FontSize="11"/>
+                                </DockPanel>
+                                <TextBlock Classes="hint"
+                                           Text="What macOS thinks this app is. If clicking, hotkeys or the crosshair are not working, copy this and send it - it answers most of what would otherwise be asked."/>
+                                <TextBlock Name="DiagnosticsText" Classes="hint" TextWrapping="Wrap"
+                                           FontFamily="Menlo, Consolas, monospace" Margin="0,10,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card">
+                            <StackPanel>
+                                <DockPanel LastChildFill="False">
                                     <TextBlock Text="STORED DATA" Foreground="{DynamicResource TextMuted}"
                                                FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
                                     <Button Name="OpenSettingsFolderButton" DockPanel.Dock="Right"

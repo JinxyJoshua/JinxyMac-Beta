@@ -165,6 +165,7 @@ public partial class MainWindow : Window
         WirePresets();
         WireKitWheel();
         WireCrosshair();
+        WireDiagnostics();
         WireMacros();
         WireSwitcher();
         WireMacroBadge();
@@ -301,6 +302,10 @@ public partial class MainWindow : Window
         // visit, and pulling down any pictures this install has not got, all
         // belong to arriving on the page rather than to launch — someone who
         // never opens it never pays for the decode or the bandwidth.
+        // Read fresh each time: someone opens this page precisely because they
+        // just changed a permission, and a cached answer would be the old one.
+        if (ReferenceEquals(page, PageSettings)) RefreshDiagnostics();
+
         if (ReferenceEquals(page, PageKitWheel))
         {
             EnsureKitWheelBuilt();
