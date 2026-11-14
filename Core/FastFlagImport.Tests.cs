@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using Xunit;
 
@@ -37,7 +38,7 @@ public class FastFlagImportTests
 
         Assert.Equal(
             new[] { "DFIntTaskSchedulerTargetFps", "FFlagSomethingInvented" },
-            result.Ignored.OrderBy(n => n));
+            result.Ignored.OrderBy(n => n, StringComparer.Ordinal));
     }
 
     /// <summary>
@@ -204,7 +205,7 @@ public class FastFlagImportTests
         """);
 
         Assert.Single(result.Supported);
-        Assert.Equal(new[] { "Version", "note" }, result.Unreadable.OrderBy(n => n));
+        Assert.Equal(new[] { "Version", "note" }, result.Unreadable.OrderBy(n => n, StringComparer.Ordinal));
     }
 
     /// <summary>
