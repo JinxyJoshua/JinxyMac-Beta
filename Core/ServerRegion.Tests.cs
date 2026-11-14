@@ -96,13 +96,24 @@ public class ServerRegionTests
     }
 
     /// <summary>
-    /// A city-state answers with the same word for city and region, and
-    /// "Singapore, Singapore, Singapore" is not a location.
+    /// A city-state answers with the same word for city, region and country, so
+    /// the quiet line has nothing left to add and says nothing — rather than
+    /// "Singapore, Singapore" under a headline that already reads Singapore.
     /// </summary>
     [Fact]
     public void TheDetailLineDoesNotRepeatTheCityOrTheCountry()
     {
-        Assert.Equal("Singapore", Region("SG", "Singapore", "Singapore", "Singapore").Detail);
+        Assert.Equal("", Region("SG", "Singapore", "Singapore", "Singapore").Detail);
+    }
+
+    /// <summary>
+    /// But a city inside a differently named region keeps both, which is the
+    /// ordinary case and the reason the line exists.
+    /// </summary>
+    [Fact]
+    public void ARegionThatAddsSomethingIsKept()
+    {
+        Assert.Equal("Bavaria, Germany", Region("DE", "Germany", "Bavaria", "Munich").Detail);
     }
 
     [Fact]
