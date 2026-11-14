@@ -1,0 +1,39 @@
+name: Tests
+
+# Why the tests live on a runner rather than only on the development machine:
+# the Windows PC this Mac app is written on has Smart App Control switched on,
+# and that policy refuses to load any freshly built unsigned assembly — the app
+# and the test DLL alike (0x800711C7). Nothing could be run locally to check it.
+#
+# A runner has no such policy, and macos-latest is the platform this app
+# actually ships to, so the suite now runs on the real target instead of on a
+# machine pretending to be it. Every push is checked on a Mac before a release
+# is cut from it.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Both of the app's frameworks: releases ship a net8.0 build for older
+      # macOS alongside the net10.0 one, so a change that only compiles under
+      # the newer one has to fail here rather than at packaging time.
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Build the app for both frameworks
+        run: dotnet build JinxyMac.csproj -c Release --nologo
+
+      - name: Run the test suite
+        run: dotnet test Testing/JinxyMac.Tests.csproj -c Release --nologo --logger "console;verbosity=normal"
