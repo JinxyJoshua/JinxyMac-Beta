@@ -235,6 +235,7 @@
                     <RadioButton Classes="nav" GroupName="Nav" Content="Recorder" Name="NavRecorder"/>
                     <RadioButton Classes="nav" GroupName="Nav" Content="Kit Wheel" Name="NavKitWheel"/>
                     <RadioButton Classes="nav" GroupName="Nav" Content="Crosshair" Name="NavCrosshair"/>
+                    <RadioButton Classes="nav" GroupName="Nav" Content="Performance" Name="NavPerformance"/>
                     <RadioButton Classes="nav" GroupName="Nav" Content="History" Name="NavHistory"/>
                     <RadioButton Classes="nav" GroupName="Nav" Content="Theme" Name="NavTheme"/>
                     <RadioButton Classes="nav" GroupName="Nav" Content="Settings" Name="NavSettings"/>
@@ -966,6 +967,62 @@
                                            Stretch="Uniform"/>
                                 </Border>
                             </Grid>
+                        </Border>
+
+                    </StackPanel>
+
+                    <!-- Performance: Roblox's own client settings, written where the
+                         Mac client reads them. See MainWindow.Tweaks.cs. -->
+                    <StackPanel Name="PagePerformance" IsVisible="False">
+
+                        <Border Classes="card">
+                            <StackPanel>
+                                <TextBlock Text="FRAME RATE" Classes="label"/>
+                                <TextBlock Classes="hint" TextWrapping="Wrap" HorizontalAlignment="Left" MaxWidth="620"
+                                           Text="Roblox on a Mac draws 60 frames a second unless it is told otherwise. Raising this is the single biggest difference you can feel, and it does not need any permission - so it works even if the clicker says BLOCKED."/>
+                                <WrapPanel Name="FpsChoicePanel" Margin="0,12,0,0">
+                                    <RadioButton Classes="segment" GroupName="FpsChoice" Tag="60" Content="60 (default)"/>
+                                    <RadioButton Classes="segment" GroupName="FpsChoice" Tag="120" Content="120"/>
+                                    <RadioButton Classes="segment" GroupName="FpsChoice" Tag="144" Content="144"/>
+                                    <RadioButton Classes="segment" GroupName="FpsChoice" Tag="240" Content="240"/>
+                                    <RadioButton Classes="segment" GroupName="FpsChoice" Tag="9999" Content="Unlimited"/>
+                                </WrapPanel>
+                                <TextBlock Classes="hint" Margin="0,10,0,0"
+                                           Text="Your screen still shows its own refresh rate. A higher target mainly makes the game feel more responsive."/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card">
+                            <StackPanel>
+                                <TextBlock Text="LESS TO DRAW" Classes="label"/>
+                                <TextBlock Classes="hint" TextWrapping="Wrap" HorizontalAlignment="Left" MaxWidth="620"
+                                           Text="Fewer things on screen means the frames that are drawn come faster. Both of these are a trade, and both are undone by Restore."/>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0" Spacing="10">
+                                    <Button Name="FpsBoostButton" Content="Lower graphics" Height="38" Padding="16,0"/>
+                                    <Button Name="GraySkyButton" Content="Sky: normal" Height="38" Padding="16,0"/>
+                                </StackPanel>
+
+                                <TextBlock Classes="hint" Margin="0,10,0,0" TextWrapping="Wrap" HorizontalAlignment="Left" MaxWidth="620"
+                                           Text="Lower graphics drops texture detail, grass, anti-aliasing and moving light. Grey sky replaces the skybox with flat grey - ugly, and genuinely faster."/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card">
+                            <StackPanel>
+                                <DockPanel LastChildFill="False">
+                                    <Button Name="RestoreTweaksButton" DockPanel.Dock="Right"
+                                            Content="Restore" Height="34" MinWidth="96" Padding="14,0"/>
+                                    <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                                        <TextBlock Text="APPLIED" Classes="label"/>
+                                        <TextBlock Name="TweaksStatus" Classes="hint" TextWrapping="Wrap"
+                                                   Text="Nothing applied - Roblox is running on its own settings."/>
+                                    </StackPanel>
+                                </DockPanel>
+
+                                <TextBlock Classes="hint" Margin="0,12,0,0" TextWrapping="Wrap" HorizontalAlignment="Left" MaxWidth="620"
+                                           Text="These are Roblox's own settings, the ones it publishes as fair to change. Nothing here touches how your character moves. A Roblox update replaces them, so come back and apply again after one."/>
+                            </StackPanel>
                         </Border>
 
                     </StackPanel>

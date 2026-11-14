@@ -166,6 +166,7 @@ public partial class MainWindow : Window
         WireKitWheel();
         WireCrosshair();
         WireDiagnostics();
+        WireTweaks();
         WireMacros();
         WireSwitcher();
         WireMacroBadge();
@@ -261,6 +262,7 @@ public partial class MainWindow : Window
         Wire(NavRecorder, PageRecorder, "Recorder", "Screen capture, hardware encoded");
         Wire(NavKitWheel, PageKitWheel, "Kit Wheel", "Roll a kit you have not played yet");
         Wire(NavCrosshair, PageCrosshair, "Crosshair", "A crosshair in place of Roblox's cursor");
+        Wire(NavPerformance, PagePerformance, "Performance", "Roblox's own settings, for more frames");
         Wire(NavHistory, PageHistory, "History", "Time spent clicking, and how much of it landed");
         Wire(NavTheme, PageTheme, "Theme", "Accent colour");
         Wire(NavSettings, PageSettings, "Settings", "Where things are stored, and what this build can do");
@@ -282,6 +284,7 @@ public partial class MainWindow : Window
         PageSettings.IsVisible = ReferenceEquals(page, PageSettings);
         PageKitWheel.IsVisible = ReferenceEquals(page, PageKitWheel);
         PageCrosshair.IsVisible = ReferenceEquals(page, PageCrosshair);
+        PagePerformance.IsVisible = ReferenceEquals(page, PagePerformance);
         PageMacros.IsVisible = ReferenceEquals(page, PageMacros);
         PageSwitcher.IsVisible = ReferenceEquals(page, PageSwitcher);
 
@@ -305,6 +308,11 @@ public partial class MainWindow : Window
         // Read fresh each time: someone opens this page precisely because they
         // just changed a permission, and a cached answer would be the old one.
         if (ReferenceEquals(page, PageSettings)) RefreshDiagnostics();
+
+        // Read from Roblox's file each time rather than cached: a Roblox update
+        // silently resets these, so a remembered answer would be wrong exactly
+        // when it matters.
+        if (ReferenceEquals(page, PagePerformance)) RefreshTweaks();
 
         if (ReferenceEquals(page, PageKitWheel))
         {

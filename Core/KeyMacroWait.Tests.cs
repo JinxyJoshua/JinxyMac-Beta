@@ -76,14 +76,27 @@ public class KeyMacroWaitTests
     {
         using var timer = new RaisedTimer();
 
-        var clock = Stopwatch.StartNew();
+        // Best of five, because this measures wall-clock on a machine that is
+        // also running the rest of the suite. It failed once in a full run and
+        // passed every time on its own, and a test that cries wolf under load
+        // teaches people to ignore it. The bug it guards against — a sliced
+        // sleep drifting to 240ms and beyond — is drift that happens on every
+        // attempt, so it cannot hide in the best one. Only a scheduler hiccup
+        // can, and that is the thing being filtered out.
+        double best = double.MaxValue;
 
-        for (int i = 0; i < 10; i++) MacroRunner.Wait(20, CancellationToken.None);
+        for (int attempt = 0; attempt < 5; attempt++)
+        {
+            var clock = Stopwatch.StartNew();
 
-        double elapsed = clock.Elapsed.TotalMilliseconds;
+            for (int i = 0; i < 10; i++) MacroRunner.Wait(20, CancellationToken.None);
 
-        Assert.True(elapsed < 225.0,
-            $"ten 20ms waits took {elapsed:F1}ms; 200ms was asked for and a sliced sleep is back");
+            best = Math.Min(best, clock.Elapsed.TotalMilliseconds);
+        }
+
+        Assert.True(best < 225.0,
+            $"the best of five runs of ten 20ms waits took {best:F1}ms; "
+            + "200ms was asked for and a sliced sleep is back");
     }
 
     /// <summary>
