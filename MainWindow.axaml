@@ -249,7 +249,7 @@
                 <StackPanel DockPanel.Dock="Top" Margin="20,22,20,18">
                     <TextBlock Text="Jinxy" FontSize="21" FontWeight="Bold"
                                Foreground="{DynamicResource Text}"/>
-                    <TextBlock Text="MAC BUILD" FontSize="9" FontWeight="Bold"
+                    <TextBlock Text="Mac build" FontSize="9" FontWeight="Bold"
                                Foreground="{DynamicResource Accent}" Margin="0,3,0,0"/>
                 </StackPanel>
 
@@ -341,7 +341,7 @@
                                 BorderBrush="{DynamicResource Accent}" BorderThickness="1"
                                 CornerRadius="12" Padding="18" Margin="0,0,0,14">
                             <StackPanel>
-                                <TextBlock Text="MACOS IS DISCARDING THE CLICKS"
+                                <TextBlock Text="macOS is discarding the clicks"
                                            Foreground="{DynamicResource Accent}"
                                            FontSize="10" FontWeight="Bold"/>
                                 <TextBlock Name="PermissionReasonText" Classes="hint"/>
@@ -364,8 +364,7 @@
                         <Grid ColumnDefinitions="*,14,*" Margin="0,0,0,14">
                             <Border Grid.Column="0" Classes="tile">
                                 <StackPanel>
-                                    <TextBlock Text="CPU" Foreground="{DynamicResource TextMuted}"
-                                               FontSize="10" FontWeight="Bold"/>
+                                    <TextBlock Classes="tiny" Text="CPU"/>
                                     <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
                                         <TextBlock Name="CpuText" Text="--%" FontSize="20" FontWeight="Bold"/>
                                         <TextBlock Text="(All Processes)" VerticalAlignment="Bottom"
@@ -376,8 +375,7 @@
                             </Border>
                             <Border Grid.Column="2" Classes="tile">
                                 <StackPanel>
-                                    <TextBlock Text="RAM" Foreground="{DynamicResource TextMuted}"
-                                               FontSize="10" FontWeight="Bold"/>
+                                    <TextBlock Classes="tiny" Text="RAM"/>
                                     <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
                                         <TextBlock Name="RamText" Text="-- GB" FontSize="20" FontWeight="Bold"/>
                                         <TextBlock Text="(All Processes)" VerticalAlignment="Bottom"
@@ -698,7 +696,7 @@
                                 BorderBrush="{DynamicResource Accent}" BorderThickness="1"
                                 CornerRadius="12" Padding="18" Margin="0,0,0,14">
                             <StackPanel>
-                                <TextBlock Text="RECORDING NEEDS FFMPEG"
+                                <TextBlock Text="Recording needs FFmpeg"
                                            Foreground="{DynamicResource Accent}"
                                            FontSize="10" FontWeight="Bold"/>
                                 <TextBlock Text="Nothing on this page works without it. Everything else in the app — clicking, hotkeys, presets, shake, history — is unaffected."
@@ -725,16 +723,14 @@
 
                         <Border Classes="card">
                             <StackPanel>
-                                <TextBlock Text="RECORD" Foreground="{DynamicResource TextMuted}"
-                                           FontSize="10" FontWeight="Bold"/>
+                                <TextBlock Classes="label" Text="Record"/>
                                 <TextBlock Name="BackendDetail" Classes="hint"/>
 
                                 <TextBlock Name="RecordElapsedText" Text="00:00" FontSize="30"
                                            FontWeight="Bold" Foreground="{DynamicResource Accent}"
                                            Margin="0,10,0,0"/>
 
-                                <TextBlock Text="CAPTURE" Foreground="{DynamicResource TextMuted}"
-                                           FontSize="10" FontWeight="Bold" Margin="0,18,0,0"/>
+                                <TextBlock Classes="label" Text="Capture" Margin="0,18,0,0"/>
                                 <TextBlock Text="Which screen goes into the clip. Instant replay follows the same choice."
                                            Classes="hint"/>
 
@@ -743,8 +739,7 @@
                                 <WrapPanel Name="DisplayPanel" Margin="0,10,0,0"/>
                                 <TextBlock Name="ScreenNote" Classes="hint"/>
 
-                                <TextBlock Text="FRAMERATE" Foreground="{DynamicResource TextMuted}"
-                                           FontSize="10" FontWeight="Bold" Margin="0,18,0,0"/>
+                                <TextBlock Classes="label" Text="Framerate" Margin="0,18,0,0"/>
                                 <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
                                     <RadioButton Name="Fps30" GroupName="Fps" Classes="segment" Content="30"/>
                                     <RadioButton Name="Fps60" GroupName="Fps" Classes="segment" Content="60"
@@ -802,8 +797,7 @@
                         <Border Classes="card">
                             <StackPanel>
                                 <DockPanel LastChildFill="False">
-                                    <TextBlock Text="INSTANT REPLAY" Foreground="{DynamicResource TextMuted}"
-                                               FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <TextBlock Classes="label" Text="Instant replay" VerticalAlignment="Center"/>
                                     <CheckBox Name="ReplayEnabled" DockPanel.Dock="Right" Margin="0"
                                               VerticalAlignment="Center"/>
                                 </DockPanel>
@@ -841,8 +835,7 @@
 
                         <Border Classes="card">
                             <StackPanel>
-                                <TextBlock Text="SHARE A CLIP" Foreground="{DynamicResource TextMuted}"
-                                           FontSize="10" FontWeight="Bold"/>
+                                <TextBlock Classes="label" Text="Share a clip"/>
                                 <TextBlock Text="Pick a clip and get a link back, instead of handing someone a file."
                                            Classes="hint"/>
 
@@ -871,8 +864,7 @@
 
                         <Border Classes="card">
                             <StackPanel>
-                                <TextBlock Text="LINK" Foreground="{DynamicResource TextMuted}"
-                                           FontSize="10" FontWeight="Bold"/>
+                                <TextBlock Classes="label" Text="Link"/>
 
                                 <DockPanel LastChildFill="False" Margin="0,10,0,0">
                                     <Button Name="CopyLinkButton" Content="Copy" DockPanel.Dock="Right"
@@ -1264,8 +1256,7 @@
 
                         <Border Classes="card">
                             <StackPanel>
-                                <TextBlock Text="MODE" Foreground="{DynamicResource TextMuted}"
-                                           FontSize="10" FontWeight="Bold"/>
+                                <TextBlock Classes="label" Text="Mode"/>
                                 <TextBlock Text="Swaps the backgrounds, text and controls. The accent is unaffected — it stays whichever colour is chosen below."
                                            Classes="hint"/>
 
@@ -1281,8 +1272,7 @@
                         <Border Classes="card">
                             <StackPanel>
                                 <DockPanel LastChildFill="False">
-                                    <TextBlock Text="ACCENT COLOUR" Foreground="{DynamicResource TextMuted}"
-                                               FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <TextBlock Classes="label" Text="Accent colour" VerticalAlignment="Center"/>
                                     <TextBlock Name="AccentNameText" DockPanel.Dock="Right" Text="Crimson"
                                                Foreground="{DynamicResource Accent}" FontSize="12"
                                                FontWeight="Bold" VerticalAlignment="Center"/>
@@ -1307,8 +1297,7 @@
                         <Border Classes="card">
                             <StackPanel>
                                 <DockPanel LastChildFill="False">
-                                    <TextBlock Text="WINDOW OPACITY" Foreground="{DynamicResource TextMuted}"
-                                               FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <TextBlock Classes="label" Text="Window opacity" VerticalAlignment="Center"/>
                                     <TextBlock Name="OpacityValueText" DockPanel.Dock="Right" Text="100%"
                                                Foreground="{DynamicResource TextMuted}" FontSize="11"
                                                VerticalAlignment="Center"/>
@@ -1323,8 +1312,7 @@
 
                         <Border Classes="card">
                             <StackPanel>
-                                <TextBlock Text="PREVIEW" Foreground="{DynamicResource TextMuted}"
-                                           FontSize="10" FontWeight="Bold"/>
+                                <TextBlock Classes="label" Text="Preview"/>
                                 <TextBlock Text="The same pieces the rest of the app is built from, so a colour can be judged before it is lived with."
                                            Classes="hint"/>
 
@@ -1358,7 +1346,7 @@
 
                         <Border Classes="card" Margin="0,14,0,0">
                             <StackPanel>
-                                <TextBlock Text="BACKGROUND" FontWeight="Bold"/>
+                                <TextBlock Text="Background" FontWeight="Bold"/>
                                 <TextBlock Classes="hint" Margin="0,4,0,0"
                                            Text="A picture behind the window. It is copied here, so moving or deleting the original changes nothing."/>
 
@@ -1370,7 +1358,7 @@
                                 <TextBlock Name="WallpaperStatusText" Classes="hint" Margin="0,10,0,0"
                                            Text="No picture set."/>
 
-                                <TextBlock Text="DIMMING" FontWeight="Bold" Margin="0,16,0,0"/>
+                                <TextBlock Text="Dimming" FontWeight="Bold" Margin="0,16,0,0"/>
                                 <Slider Name="WallpaperDimmingSlider" Minimum="0" Maximum="90"
                                         Value="45" Margin="0,6,0,0"/>
                             </StackPanel>
@@ -1400,8 +1388,7 @@
                         <Border Classes="card">
                             <StackPanel>
                                 <DockPanel LastChildFill="False">
-                                    <TextBlock Text="HOTKEYS" Foreground="{DynamicResource TextMuted}"
-                                               FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <TextBlock Classes="label" Text="Hotkeys" VerticalAlignment="Center"/>
                                     <CheckBox Name="HotkeysEnabled" DockPanel.Dock="Right" Margin="0"
                                               IsChecked="True" VerticalAlignment="Center"/>
                                 </DockPanel>
@@ -1417,8 +1404,7 @@
                         <Border Classes="card" Name="PermissionsCard">
                             <StackPanel>
                                 <DockPanel LastChildFill="False">
-                                    <TextBlock Text="PERMISSIONS" Foreground="{DynamicResource TextMuted}"
-                                               FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <TextBlock Classes="label" Text="Permissions" VerticalAlignment="Center"/>
                                     <Button Name="RecheckPermissionsButton" DockPanel.Dock="Right"
                                             Content="Re-check" Padding="14,6" FontSize="11"/>
                                 </DockPanel>
@@ -1459,8 +1445,7 @@
 
                         <Border Classes="card">
                             <StackPanel>
-                                <TextBlock Text="CLIP FOLDER" Foreground="{DynamicResource TextMuted}"
-                                           FontSize="10" FontWeight="Bold"/>
+                                <TextBlock Classes="label" Text="Clip folder"/>
                                 <TextBlock Name="ClipFolderHint" Classes="hint"
                                            Text="Where recordings and saved replays are written."/>
 
@@ -1480,8 +1465,7 @@
                         <Border Classes="card">
                             <StackPanel>
                                 <DockPanel LastChildFill="False">
-                                    <TextBlock Text="ROBLOX CACHE" Foreground="{DynamicResource TextMuted}"
-                                               FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <TextBlock Classes="label" Text="Roblox cache" VerticalAlignment="Center"/>
                                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                                         <Button Name="MeasureCacheButton" Content="Measure"
                                                 Padding="14,6" FontSize="11" Margin="0,0,10,0"/>
@@ -1503,8 +1487,7 @@
                         <Border Classes="card">
                             <StackPanel>
                                 <DockPanel LastChildFill="False">
-                                    <TextBlock Text="MENU BAR" Foreground="{DynamicResource TextMuted}"
-                                               FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <TextBlock Classes="label" Text="Menu bar" VerticalAlignment="Center"/>
                                     <CheckBox Name="MenuBarEnabled" DockPanel.Dock="Right" Margin="0"
                                               IsChecked="True" VerticalAlignment="Center"/>
                                 </DockPanel>
@@ -1516,8 +1499,7 @@
 
                         <Border Classes="card">
                             <StackPanel>
-                                <TextBlock Text="INPUT ENGINE" Foreground="{DynamicResource TextMuted}"
-                                           FontSize="10" FontWeight="Bold"/>
+                                <TextBlock Classes="label" Text="Input engine"/>
                                 <TextBlock Name="EngineDetail" Classes="hint"/>
                             </StackPanel>
                         </Border>
@@ -1525,8 +1507,7 @@
                         <Border Classes="card">
                             <StackPanel>
                                 <DockPanel LastChildFill="False">
-                                    <TextBlock Text="DIAGNOSTICS" Foreground="{DynamicResource TextMuted}"
-                                               FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <TextBlock Classes="label" Text="Diagnostics" VerticalAlignment="Center"/>
                                     <Button Name="CopyDiagnosticsButton" DockPanel.Dock="Right"
                                             Content="Copy" Padding="14,6" FontSize="11"/>
                                 </DockPanel>
@@ -1540,8 +1521,7 @@
                         <Border Classes="card">
                             <StackPanel>
                                 <DockPanel LastChildFill="False">
-                                    <TextBlock Text="STORED DATA" Foreground="{DynamicResource TextMuted}"
-                                               FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <TextBlock Classes="label" Text="Stored data" VerticalAlignment="Center"/>
                                     <Button Name="OpenSettingsFolderButton" DockPanel.Dock="Right"
                                             Content="Open folder" Padding="14,6" FontSize="11"/>
                                 </DockPanel>
@@ -1567,8 +1547,7 @@
                         <Border Classes="card">
                             <StackPanel>
                                 <DockPanel LastChildFill="False">
-                                    <TextBlock Text="UPDATES" Foreground="{DynamicResource TextMuted}"
-                                               FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <TextBlock Classes="label" Text="Updates" VerticalAlignment="Center"/>
                                     <Button Name="CheckUpdateButton" DockPanel.Dock="Right"
                                             Content="Check now" Padding="14,6" FontSize="11"/>
                                 </DockPanel>
@@ -1606,8 +1585,7 @@
 
                         <Border Classes="card">
                             <StackPanel>
-                                <TextBlock Text="ABOUT" Foreground="{DynamicResource TextMuted}"
-                                           FontSize="10" FontWeight="Bold"/>
+                                <TextBlock Classes="label" Text="About"/>
                                 <TextBlock Name="AboutText" Classes="hint"/>
                             </StackPanel>
                         </Border>
@@ -1632,7 +1610,7 @@
                                         Height="220" Margin="0,14,0,0">
                                     <Grid Name="RevealPanel">
                                         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                            <TextBlock Name="RollBadgeText" Text="KIT ROLL"
+                                            <TextBlock Name="RollBadgeText" Text="Kit roll"
                                                        HorizontalAlignment="Center" FontSize="11"
                                                        FontWeight="Bold" Foreground="{DynamicResource Accent}"/>
 
@@ -1754,7 +1732,7 @@
                                                    Foreground="{DynamicResource Accent}" FontSize="16"
                                                    FontWeight="Bold" Margin="0,0,11,0"
                                                    VerticalAlignment="Center"/>
-                                        <TextBlock Text="PICK YOUR KITS" DockPanel.Dock="Left"
+                                        <TextBlock Text="Pick your kits" DockPanel.Dock="Left"
                                                    Foreground="{DynamicResource TextBright}" FontSize="14"
                                                    FontWeight="Bold" VerticalAlignment="Center"/>
                                         <TextBlock Name="KitCountText" DockPanel.Dock="Right"
