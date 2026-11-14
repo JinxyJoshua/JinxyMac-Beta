@@ -32,49 +32,40 @@ public sealed record Palette(
 {
     /// <summary>The shipped look, and what the Windows build uses.</summary>
     public static Palette Dark { get; } = new(
-        Backdrop: "#0F141D",
-        Panel: "#1A2230",
-        Panel2: "#151C27",
-        Rail: "#151B25",
-        Sunken: "#101620",
-        Control: "#202A39",
-        ControlAlt: "#1E2634",
-        Track: "#2A3445",
-        Divider: "#232E3E",
+        Backdrop: "#0F1528",
+        Panel: "#171F38",
+        Panel2: "#131A30",
+        Rail: "#121930",
+        Sunken: "#0B1120",
+        Control: "#212B4B",
+        ControlAlt: "#1B2440",
+        Track: "#2C3860",
+        Divider: "#27324F",
         Hairline: "#1AFFFFFF",
-        Hover: "#0DFFFFFF",
-        Text: "#E9EDF4",
+        Hover: "#12FFFFFF",
+        Text: "#EEF2FF",
         TextBright: "#FFFFFF",
-        TextSoft: "#AAB4C5",
-        TextDim: "#C3CDDD",
-        TextMuted: "#8D98AA");
+        TextSoft: "#A4AFD2",
+        TextDim: "#C9D2EC",
+        TextMuted: "#8B95B9");
 
-    /// <summary>
-    /// The same roles inverted.
-    /// </summary>
-    /// <remarks>
-    /// Not a mechanical inversion of the dark values. Light interfaces need the
-    /// panels lighter than the page rather than darker — the raised surface is
-    /// the bright one — so Panel goes to white while Backdrop stays grey, which
-    /// is the opposite of how the dark set is ordered.
-    /// </remarks>
     public static Palette Light { get; } = new(
-        Backdrop: "#EEF1F6",
+        Backdrop: "#ECEFF9",
         Panel: "#FFFFFF",
-        Panel2: "#F6F8FC",
-        Rail: "#E4E9F1",
-        Sunken: "#EDF1F7",
-        Control: "#E1E7F0",
-        ControlAlt: "#D8E0EB",
-        Track: "#C4CEDD",
-        Divider: "#DCE3EC",
+        Panel2: "#F5F7FE",
+        Rail: "#E3E7F6",
+        Sunken: "#EBEFFA",
+        Control: "#DFE4F3",
+        ControlAlt: "#D5DBEF",
+        Track: "#C0C8E2",
+        Divider: "#DAE0F1",
         Hairline: "#14000000",
         Hover: "#0D000000",
-        Text: "#16202E",
-        TextBright: "#0B1219",
-        TextSoft: "#4A5666",
-        TextDim: "#33404F",
-        TextMuted: "#6B7787");
+        Text: "#141A2E",
+        TextBright: "#070B16",
+        TextSoft: "#49536F",
+        TextDim: "#313B55",
+        TextMuted: "#69739A");
 
     public static Palette For(bool dark) => dark ? Dark : Light;
 

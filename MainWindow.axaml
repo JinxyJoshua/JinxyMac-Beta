@@ -75,11 +75,26 @@
              what keeps them from reading as one surface. -->
         <Style Selector="Border.card">
             <Setter Property="Background" Value="{DynamicResource Panel}"/>
-            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="CornerRadius" Value="10"/>
             <Setter Property="Padding" Value="20"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Divider}"/>
-            <Setter Property="Margin" Value="0,0,0,14"/>
+            <Setter Property="Margin" Value="0,0,0,12"/>
+        </Style>
+
+        <!-- The one block on a page that is the reason you opened it: the rate
+             on Clicker, the frame rate on Performance. Raised rather than
+             outlined, and a wider radius, so importance is read before anything
+             is read. Three radii in the app - 14 here, 10 on a card, 6 on a
+             control - because one radius on everything is a decoration rather
+             than a hierarchy. -->
+        <Style Selector="Border.hero">
+            <Setter Property="Background" Value="{DynamicResource Control}"/>
+            <Setter Property="CornerRadius" Value="14"/>
+            <Setter Property="Padding" Value="22"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Track}"/>
+            <Setter Property="Margin" Value="0,0,0,12"/>
         </Style>
 
         <Style Selector="Border.tile">
@@ -91,23 +106,35 @@
         <!-- 14px semibold rather than 10px uppercase: at 10 the labels read as
              a caption beside a 17px button, which made the cards look lopsided
              rather than small. -->
+        <!-- A heading, not an eyebrow. It used to be small, dim and typed in
+             capitals above every card, which is the most templated thing an
+             interface can do: it shouts the section name at the same volume
+             everywhere and tells you nothing. Sentence case at reading size,
+             in the ordinary text colour, so headings sit in the hierarchy
+             rather than above it. -->
         <Style Selector="TextBlock.label">
-            <Setter Property="Foreground" Value="{DynamicResource TextDim}"/>
-            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text}"/>
+            <Setter Property="FontSize" Value="15"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
         </Style>
 
         <Style Selector="TextBlock.hint">
             <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
-            <Setter Property="FontSize" Value="12.5"/>
-            <Setter Property="Margin" Value="0,4,0,0"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Margin" Value="0,5,0,0"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
+            <!-- Roughly 70 characters at this size. Longer lines are harder to
+                 come back to, and most of these sit beside a control. -->
+            <Setter Property="MaxWidth" Value="560"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
         </Style>
 
+        <!-- The label under a box. Quiet and in sentence case: it names a
+             field, it is not an announcement. -->
         <Style Selector="TextBlock.tiny">
             <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
-            <Setter Property="FontSize" Value="9"/>
-            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Medium"/>
         </Style>
 
         <Style Selector="TextBlock.value">
@@ -378,7 +405,7 @@
                                                 HorizontalContentAlignment="Center"
                                                 VerticalContentAlignment="Center"/>
                                         <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
-                                            <TextBlock Text="KEYBIND" Classes="label"/>
+                                            <TextBlock Text="Keybind" Classes="label"/>
                                             <TextBlock Text="Starts and stops clicking" Classes="hint"/>
                                         </StackPanel>
                                     </DockPanel>
@@ -394,7 +421,7 @@
                                                 HorizontalContentAlignment="Center"
                                                 VerticalContentAlignment="Center"/>
                                         <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
-                                            <TextBlock Text="AUTOCLICKER + SHAKE" Classes="label"/>
+                                            <TextBlock Text="Autoclicker + shake" Classes="label"/>
                                             <TextBlock Text="Starts and stops both together" Classes="hint"/>
                                         </StackPanel>
                                     </DockPanel>
@@ -410,7 +437,7 @@
                                                 HorizontalContentAlignment="Center"
                                                 VerticalContentAlignment="Center"/>
                                         <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
-                                            <TextBlock Text="BUILDING" Classes="label"/>
+                                            <TextBlock Text="Building" Classes="label"/>
                                             <TextBlock Name="BuildRateText" Classes="hint"
                                                        Text="Fixed 35 CPS at 1% — Ignores the sliders"/>
                                         </StackPanel>
@@ -421,7 +448,7 @@
                                 </StackPanel>
                             </Border>
 
-                            <Border Grid.Row="0" Grid.Column="2" Classes="card">
+                            <Border Grid.Row="0" Grid.Column="2" Classes="hero">
                                 <StackPanel>
                                     <DockPanel LastChildFill="False">
                                         <TextBlock Text="CPS" Classes="label" VerticalAlignment="Center"/>
@@ -456,12 +483,12 @@
                                                          IsChecked="True" Margin="0"/>
                                         </StackPanel>
                                         <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
-                                            <TextBlock Text="MODE" Classes="label"/>
+                                            <TextBlock Text="Mode" Classes="label"/>
                                             <TextBlock Text="Hold the key, or press to latch" Classes="hint"/>
                                         </StackPanel>
                                     </DockPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,14,0,0" Spacing="8">
-                                        <TextBlock Text="BUTTON" VerticalAlignment="Center"
+                                        <TextBlock Text="Button" VerticalAlignment="Center"
                                                    FontWeight="Bold" Margin="0,0,8,0"/>
                                         <RadioButton Name="ButtonLeft" GroupName="ClickButton"
                                                      Content="Left" IsChecked="True"/>
@@ -476,7 +503,7 @@
                             <Border Grid.Row="1" Grid.Column="2" Classes="card">
                                 <StackPanel>
                                     <DockPanel LastChildFill="False">
-                                        <TextBlock Text="DUTY CYCLE" Classes="label" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Duty cycle" Classes="label" VerticalAlignment="Center"/>
                                         <!-- Declared before the box so it docks furthest right. -->
                                         <TextBlock Text="%" DockPanel.Dock="Right" Margin="4,0,0,0"
                                                    Foreground="{DynamicResource Accent}"
@@ -496,7 +523,7 @@
                         <!-- Precision -->
                         <Border Classes="card">
                             <StackPanel>
-                                <TextBlock Text="PRECISION" Foreground="{DynamicResource TextMuted}"
+                                <TextBlock Text="Precision" Foreground="{DynamicResource TextMuted}"
                                            FontSize="10" FontWeight="Bold" Margin="0,0,0,4"/>
 
                                 <Grid Margin="0,7">
@@ -524,7 +551,7 @@
                                              moves. One row per value: label, slider, readout. -->
                                         <StackPanel Margin="0,10,16,2">
                                             <Grid ColumnDefinitions="52,*,Auto" Margin="0,4,0,0">
-                                                <TextBlock Grid.Column="0" Text="LEFT" Classes="tiny"
+                                                <TextBlock Grid.Column="0" Text="Left" Classes="tiny"
                                                            VerticalAlignment="Center"/>
                                                 <Slider Grid.Column="1" Name="ShakeLeftSlider"
                                                         Minimum="0" Maximum="100" Value="7"
@@ -534,7 +561,7 @@
                                             </Grid>
 
                                             <Grid ColumnDefinitions="52,*,Auto" Margin="0,4,0,0">
-                                                <TextBlock Grid.Column="0" Text="RIGHT" Classes="tiny"
+                                                <TextBlock Grid.Column="0" Text="Right" Classes="tiny"
                                                            VerticalAlignment="Center"/>
                                                 <Slider Grid.Column="1" Name="ShakeRightSlider"
                                                         Minimum="0" Maximum="100" Value="9"
@@ -544,7 +571,7 @@
                                             </Grid>
 
                                             <Grid ColumnDefinitions="52,*,Auto" Margin="0,4,0,0">
-                                                <TextBlock Grid.Column="0" Text="UP" Classes="tiny"
+                                                <TextBlock Grid.Column="0" Text="Up" Classes="tiny"
                                                            VerticalAlignment="Center"/>
                                                 <Slider Grid.Column="1" Name="ShakeUpSlider"
                                                         Minimum="0" Maximum="100" Value="6"
@@ -554,7 +581,7 @@
                                             </Grid>
 
                                             <Grid ColumnDefinitions="52,*,Auto" Margin="0,4,0,0">
-                                                <TextBlock Grid.Column="0" Text="DOWN" Classes="tiny"
+                                                <TextBlock Grid.Column="0" Text="Down" Classes="tiny"
                                                            VerticalAlignment="Center"/>
                                                 <Slider Grid.Column="1" Name="ShakeDownSlider"
                                                         Minimum="0" Maximum="100" Value="5"
@@ -566,7 +593,7 @@
                                             <Separator Margin="0,10,0,4"/>
 
                                             <Grid ColumnDefinitions="52,*,Auto" Margin="0,4,0,0">
-                                                <TextBlock Grid.Column="0" Text="SPEED" Classes="tiny"
+                                                <TextBlock Grid.Column="0" Text="Speed" Classes="tiny"
                                                            VerticalAlignment="Center"/>
                                                 <Slider Grid.Column="1" Name="ShakeSpeedSlider"
                                                         Minimum="5" Maximum="50" Value="50"
@@ -621,14 +648,14 @@
 
                         <Border Classes="card">
                             <StackPanel>
-                                <TextBlock Text="CUSTOM PRESET" Classes="label"/>
+                                <TextBlock Text="Custom preset" Classes="label"/>
                                 <TextBlock Name="CustomHint" Classes="hint"
                                            Text="Name it, set CPS and CDC, and it is saved between sessions"/>
 
                                 <Grid ColumnDefinitions="*,10,110,10,110,10,Auto" Margin="0,14,0,0">
                                     <StackPanel Grid.Column="0">
                                         <TextBox Name="PresetNameBox" Watermark="Name"/>
-                                        <TextBlock Text="NAME" Classes="tiny" Margin="0,6,0,0"/>
+                                        <TextBlock Text="Name" Classes="tiny" Margin="0,6,0,0"/>
                                     </StackPanel>
                                     <StackPanel Grid.Column="2">
                                         <TextBox Name="PresetCpsBox" Watermark="0.00"/>
@@ -863,7 +890,7 @@
                         <Border Classes="card">
                             <Grid ColumnDefinitions="*,190">
                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                    <TextBlock Text="IN-GAME CROSSHAIR" Classes="label"/>
+                                    <TextBlock Text="In-game crosshair" Classes="label"/>
                                     <!-- Left, not the default: a MaxWidth narrower than the
                                          column leaves Avalonia centring the block, which
                                          indents the text away from the label above it. -->
@@ -877,7 +904,7 @@
                                                Text="Pick a crosshair below, then Apply to Roblox."/>
 
                                     <Grid Name="CrosshairSizeRow" ColumnDefinitions="52,*,54" Margin="0,14,0,0">
-                                        <TextBlock Grid.Column="0" Text="SIZE" Classes="tiny"
+                                        <TextBlock Grid.Column="0" Text="Size" Classes="tiny"
                                                    VerticalAlignment="Center"/>
                                         <Slider Grid.Column="1" Name="CrosshairSizeSlider"
                                                 Minimum="40" Maximum="160" Value="100"
@@ -914,7 +941,7 @@
 
                         <Border Classes="card">
                             <StackPanel>
-                                <TextBlock Text="GALLERY" Classes="label"/>
+                                <TextBlock Text="Gallery" Classes="label"/>
                                 <TextBlock Classes="hint" Margin="0,4,0,0"
                                            Text="Tap one to preview it, then Apply to Roblox. The first tile is Roblox's own cursor - apply that to put everything back."/>
                                 <WrapPanel Name="CrosshairGalleryPanel" Margin="0,12,0,0"/>
@@ -924,11 +951,11 @@
                         <Border Classes="card">
                             <Grid ColumnDefinitions="*,140">
                                 <StackPanel Grid.Column="0">
-                                    <TextBlock Text="MAKE YOUR OWN" Classes="label"/>
+                                    <TextBlock Text="Make your own" Classes="label"/>
                                     <TextBlock Classes="hint" Margin="0,4,0,0"
                                                Text="Pick a shape and two colours, then add it to the gallery."/>
 
-                                    <TextBlock Text="SHAPE" Classes="tiny" Margin="0,12,0,6"/>
+                                    <TextBlock Text="Shape" Classes="tiny" Margin="0,12,0,6"/>
                                     <WrapPanel Name="CrosshairShapePanel">
                                         <RadioButton Classes="segment" GroupName="CrosshairShape" Tag="Cross"
                                                      Content="Cross" IsChecked="True"/>
@@ -948,10 +975,10 @@
                                                      Content="T"/>
                                     </WrapPanel>
 
-                                    <TextBlock Text="COLOUR" Classes="tiny" Margin="0,14,0,6"/>
+                                    <TextBlock Text="Colour" Classes="tiny" Margin="0,14,0,6"/>
                                     <WrapPanel Name="CrosshairColorPanel"/>
 
-                                    <TextBlock Text="CENTRE" Classes="tiny" Margin="0,8,0,6"/>
+                                    <TextBlock Text="Centre" Classes="tiny" Margin="0,8,0,6"/>
                                     <WrapPanel Name="CrosshairDotColorPanel"/>
 
                                     <Button Name="CrosshairAddButton" Content="Add to gallery"
@@ -975,9 +1002,9 @@
                          Mac client reads them. See MainWindow.Tweaks.cs. -->
                     <StackPanel Name="PagePerformance" IsVisible="False">
 
-                        <Border Classes="card">
+                        <Border Classes="hero">
                             <StackPanel>
-                                <TextBlock Text="FRAME RATE" Classes="label"/>
+                                <TextBlock Text="Frame rate" Classes="label"/>
                                 <TextBlock Classes="hint" TextWrapping="Wrap" HorizontalAlignment="Left" MaxWidth="620"
                                            Text="Roblox on a Mac draws 60 frames a second unless it is told otherwise. Raising this is the single biggest difference you can feel, and it does not need any permission - so it works even if the clicker says BLOCKED."/>
                                 <WrapPanel Name="FpsChoicePanel" Margin="0,12,0,0">
@@ -994,7 +1021,7 @@
 
                         <Border Classes="card">
                             <StackPanel>
-                                <TextBlock Text="LESS TO DRAW" Classes="label"/>
+                                <TextBlock Text="Less to draw" Classes="label"/>
                                 <TextBlock Classes="hint" TextWrapping="Wrap" HorizontalAlignment="Left" MaxWidth="620"
                                            Text="Fewer things on screen means the frames that are drawn come faster. Both of these are a trade, and both are undone by Restore."/>
 
@@ -1014,7 +1041,7 @@
                                     <Button Name="RestoreTweaksButton" DockPanel.Dock="Right"
                                             Content="Restore" Height="34" MinWidth="96" Padding="14,0"/>
                                     <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
-                                        <TextBlock Text="APPLIED" Classes="label"/>
+                                        <TextBlock Text="Applied" Classes="label"/>
                                         <TextBlock Name="TweaksStatus" Classes="hint" TextWrapping="Wrap"
                                                    Text="Nothing applied - Roblox is running on its own settings."/>
                                     </StackPanel>
@@ -1031,25 +1058,25 @@
                         <Grid ColumnDefinitions="*,12,*,12,*,12,*" Margin="0,0,0,14">
                             <Border Grid.Column="0" Classes="tile">
                                 <StackPanel>
-                                    <TextBlock Text="TIME" Classes="tiny"/>
+                                    <TextBlock Text="Time" Classes="tiny"/>
                                     <TextBlock Name="TotalTimeText" Text="0s" Classes="value" Margin="0,6,0,0"/>
                                 </StackPanel>
                             </Border>
                             <Border Grid.Column="2" Classes="tile">
                                 <StackPanel>
-                                    <TextBlock Text="CLICKS" Classes="tiny"/>
+                                    <TextBlock Text="Clicks" Classes="tiny"/>
                                     <TextBlock Name="TotalClicksText" Text="0" Classes="value" Margin="0,6,0,0"/>
                                 </StackPanel>
                             </Border>
                             <Border Grid.Column="4" Classes="tile">
                                 <StackPanel>
-                                    <TextBlock Text="AVERAGE" Classes="tiny"/>
+                                    <TextBlock Text="Average" Classes="tiny"/>
                                     <TextBlock Name="AverageRateText" Text="—" Classes="value" Margin="0,6,0,0"/>
                                 </StackPanel>
                             </Border>
                             <Border Grid.Column="6" Classes="tile">
                                 <StackPanel>
-                                    <TextBlock Text="DAYS" Classes="tiny"/>
+                                    <TextBlock Text="Days" Classes="tiny"/>
                                     <TextBlock Name="DaysText" Text="0" Classes="value" Margin="0,6,0,0"/>
                                 </StackPanel>
                             </Border>
@@ -1058,7 +1085,7 @@
                         <Border Classes="card">
                             <StackPanel>
                                 <DockPanel LastChildFill="False" Margin="0,0,0,12">
-                                    <TextBlock Text="BY DAY" Classes="label" VerticalAlignment="Center"/>
+                                    <TextBlock Text="By day" Classes="label" VerticalAlignment="Center"/>
                                     <Button Name="ResetHistoryButton" DockPanel.Dock="Right"
                                             Content="Reset" Padding="14,6" FontSize="11"/>
                                 </DockPanel>
@@ -1415,9 +1442,9 @@
                         <Border Classes="card">
                             <StackPanel>
                                 <DockPanel LastChildFill="False">
-                                    <TextBlock Text="KIT ROLL" Classes="label"/>
+                                    <TextBlock Text="Kit roll" Classes="label"/>
                                     <TextBlock Name="KitsRemainingText" DockPanel.Dock="Right"
-                                               Text="0 KITS REMAINING" Classes="tiny"
+                                               Text="0 kits remaining" Classes="tiny"
                                                VerticalAlignment="Center"/>
                                 </DockPanel>
 
@@ -1487,7 +1514,7 @@
                                         HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
 
                                 <DockPanel LastChildFill="False" Margin="0,18,0,0">
-                                    <TextBlock Text="CHALLENGE PROGRESS" Classes="tiny"/>
+                                    <TextBlock Text="Challenge progress" Classes="tiny"/>
                                     <TextBlock Name="ChallengeProgressText" DockPanel.Dock="Right"
                                                Text="0 / 0" FontSize="11" FontWeight="Bold"
                                                Foreground="{DynamicResource Accent}"/>
@@ -1507,7 +1534,7 @@
 
                         <Border Classes="card">
                             <StackPanel>
-                                <TextBlock Text="SAVED WHEELS" Classes="label"/>
+                                <TextBlock Text="Saved wheels" Classes="label"/>
                                 <TextBlock Classes="hint" TextWrapping="Wrap"
                                            Text="Keep a set of kits under a name and bring it back later. Click a wheel to load it."/>
 
@@ -1566,7 +1593,7 @@
                                                Text="Tick the kits you want on the wheel. Saved as you go. Right-click a tile to give it its own picture."/>
 
                                     <Grid ColumnDefinitions="Auto,*" Margin="0,12,0,0">
-                                        <TextBlock Grid.Column="0" Text="SEARCH" Classes="tiny"
+                                        <TextBlock Grid.Column="0" Text="Search" Classes="tiny"
                                                    VerticalAlignment="Center" Margin="0,0,10,0"/>
                                         <TextBox Grid.Column="1" Name="KitSearchBox" Watermark="Search kits"/>
                                     </Grid>
@@ -1609,7 +1636,7 @@
                         <Border Classes="card">
                             <DockPanel LastChildFill="False">
                                 <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="HOTKEYS" Classes="label"/>
+                                    <TextBlock Text="Hotkeys" Classes="label"/>
                                     <TextBlock Name="MacrosHotkeyNote" Classes="hint"
                                                Text="Every bound key is live. Turn them off while you edit."/>
                                     <TextBlock Name="MacroHotkeyNoticeText" Classes="hint" IsVisible="False"
@@ -1624,7 +1651,7 @@
                         <Border Classes="card">
                             <StackPanel>
                                 <DockPanel LastChildFill="False">
-                                    <TextBlock Text="RUNNING" Classes="label" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Running" Classes="label" VerticalAlignment="Center"/>
                                     <Button Name="StopAllMacrosButton" DockPanel.Dock="Right"
                                             Content="Stop all" Padding="14,6" FontSize="11"/>
                                 </DockPanel>
@@ -1645,7 +1672,7 @@
 
                         <Border Classes="card">
                             <StackPanel>
-                                <TextBlock Text="NEW MACRO" Classes="label"/>
+                                <TextBlock Text="New macro" Classes="label"/>
                                 <TextBlock Classes="hint"
                                            Text="One letter or digit per box. Fill the second and the macro alternates between the two; leave it empty and it just spams the first."/>
 
@@ -1663,26 +1690,26 @@
                                       ColumnDefinitions="*,10,80,10,Auto,10,Auto,10,90,10,Auto">
                                     <StackPanel Grid.Column="0">
                                         <TextBox Name="MacroNameBox" Watermark="Name"/>
-                                        <TextBlock Text="NAME" Classes="tiny" Margin="0,6,0,0"/>
+                                        <TextBlock Text="Name" Classes="tiny" Margin="0,6,0,0"/>
                                     </StackPanel>
                                     <StackPanel Grid.Column="2">
                                         <TextBox Name="MacroKey1Box" MaxLength="1"/>
-                                        <TextBlock Text="KEY" Classes="tiny" Margin="0,6,0,0"/>
+                                        <TextBlock Text="Key" Classes="tiny" Margin="0,6,0,0"/>
                                     </StackPanel>
                                     <StackPanel Grid.Column="4">
                                         <TextBox Name="MacroKey2Box" MaxLength="1" MinWidth="110"/>
-                                        <TextBlock Text="2ND KEY (OPTIONAL)" Classes="tiny" Margin="0,6,0,0"/>
+                                        <TextBlock Text="2nd key (optional)" Classes="tiny" Margin="0,6,0,0"/>
                                     </StackPanel>
                                     <StackPanel Grid.Column="6">
                                         <Button Name="NewMacroHotkeyButton" Content="Not set"
                                                 Height="34" Padding="12,0" HorizontalAlignment="Stretch"
                                                 MinWidth="110" HorizontalContentAlignment="Center"
                                                 ToolTip.Tip="Click, then press a key or mouse side button"/>
-                                        <TextBlock Text="TOGGLE HOTKEY (OPTIONAL)" Classes="tiny" Margin="0,6,0,0"/>
+                                        <TextBlock Text="Toggle hotkey (optional)" Classes="tiny" Margin="0,6,0,0"/>
                                     </StackPanel>
                                     <StackPanel Grid.Column="8">
                                         <TextBox Name="MacroIntervalBox" Text="100"/>
-                                        <TextBlock Text="EVERY (MS)" Classes="tiny" Margin="0,6,0,0"/>
+                                        <TextBlock Text="Every (ms)" Classes="tiny" Margin="0,6,0,0"/>
                                     </StackPanel>
                                     <Button Grid.Column="10" Name="SaveMacroButton" Content="+ Save"
                                             Classes="accent" Height="34" Padding="20,0"
@@ -1706,7 +1733,7 @@
                         <Border Classes="card">
                             <DockPanel LastChildFill="False">
                                 <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="HOTKEYS" Classes="label"/>
+                                    <TextBlock Text="Hotkeys" Classes="label"/>
                                     <TextBlock Name="SwitcherHotkeyNote" Classes="hint"
                                                Text="Every bound key is live. Turn them off while you edit."/>
                                 </StackPanel>
@@ -1734,7 +1761,7 @@
                                                 Content="Disable" Padding="12,0" Height="30" MinWidth="86"
                                                 Margin="0,0,12,0" FontSize="11" VerticalAlignment="Center"/>
                                         <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
-                                            <TextBlock Text="AUTO SWITCHER" Classes="label"/>
+                                            <TextBlock Text="Auto switcher" Classes="label"/>
                                             <TextBlock Classes="hint" TextWrapping="Wrap"
                                                        Text="Swaps between two hotbar slots on a timer — sword and crossbow, or pickaxe and gumdrop."/>
                                         </StackPanel>
@@ -1744,23 +1771,23 @@
                                           ColumnDefinitions="110,10,110,10,120,10,120,10,120,*">
                                         <StackPanel Grid.Column="0">
                                             <TextBox Name="SlotABox" MaxLength="1"/>
-                                            <TextBlock Text="FIRST SLOT" Classes="tiny" Margin="0,6,0,0"/>
+                                            <TextBlock Text="First slot" Classes="tiny" Margin="0,6,0,0"/>
                                         </StackPanel>
                                         <StackPanel Grid.Column="2">
                                             <TextBox Name="SlotBBox" MaxLength="1"/>
-                                            <TextBlock Text="SECOND SLOT" Classes="tiny" Margin="0,6,0,0"/>
+                                            <TextBlock Text="Second slot" Classes="tiny" Margin="0,6,0,0"/>
                                         </StackPanel>
                                         <StackPanel Grid.Column="4">
                                             <TextBox Name="SwitcherIntervalBox"/>
-                                            <TextBlock Text="HOLD FIRST (MS)" Classes="tiny" Margin="0,6,0,0"/>
+                                            <TextBlock Text="Hold first (ms)" Classes="tiny" Margin="0,6,0,0"/>
                                         </StackPanel>
                                         <StackPanel Grid.Column="6">
                                             <TextBox Name="SwitcherEquipBox"/>
-                                            <TextBlock Text="EQUIP DELAY (MS)" Classes="tiny" Margin="0,6,0,0"/>
+                                            <TextBlock Text="Equip delay (ms)" Classes="tiny" Margin="0,6,0,0"/>
                                         </StackPanel>
                                         <StackPanel Grid.Column="8">
                                             <TextBox Name="SwitcherIntervalBBox"/>
-                                            <TextBlock Text="HOLD SECOND (MS)" Classes="tiny" Margin="0,6,0,0"/>
+                                            <TextBlock Text="Hold second (ms)" Classes="tiny" Margin="0,6,0,0"/>
                                         </StackPanel>
                                     </Grid>
 
@@ -1787,7 +1814,7 @@
                             <StackPanel>
                                 <DockPanel LastChildFill="False">
                                     <StackPanel VerticalAlignment="Center">
-                                        <TextBlock Text="KEYBIND" Classes="label"/>
+                                        <TextBlock Text="Keybind" Classes="label"/>
                                         <TextBlock Classes="hint"
                                                    Text="Turns the switcher on and off from inside the game"/>
                                     </StackPanel>
