@@ -264,6 +264,8 @@
                     <RadioButton Classes="nav" GroupName="Nav" Content="Crosshair" Name="NavCrosshair"/>
                     <RadioButton Classes="nav" GroupName="Nav" Content="Performance" Name="NavPerformance"/>
                     <RadioButton Classes="nav" GroupName="Nav" Content="Aim Trainer" Name="NavAim"/>
+                    <RadioButton Classes="nav" GroupName="Nav" Content="Server" Name="NavServer"/>
+                    <RadioButton Classes="nav" GroupName="Nav" Content="Scoreboard" Name="NavScore"/>
                     <RadioButton Classes="nav" GroupName="Nav" Content="History" Name="NavHistory"/>
                     <RadioButton Classes="nav" GroupName="Nav" Content="Theme" Name="NavTheme"/>
                     <RadioButton Classes="nav" GroupName="Nav" Content="Settings" Name="NavSettings"/>
@@ -1118,6 +1120,98 @@
                                            Text="A target left too long counts as a miss, so waiting is not free. Faster hits and smaller targets score higher - clicking a slow, easy target many times should not beat a fast, hard one."/>
                             </StackPanel>
                         </Border>
+
+                    </StackPanel>
+
+                    <!-- Server: where the game server you are on actually is.
+                         Reads Roblox's own log, so it needs no permission of any
+                         kind and never touches the game. See MainWindow.Server.cs. -->
+                    <StackPanel Name="PageServer" IsVisible="False">
+
+                        <Border Classes="hero">
+                            <StackPanel>
+                                <DockPanel LastChildFill="False">
+                                    <Button Name="ServerRefreshButton" DockPanel.Dock="Right"
+                                            Content="Check again" Height="38" MinWidth="124" Padding="18,0"/>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Name="ServerHeadlineText" Text="Not in a game"
+                                                   FontSize="26" FontWeight="Bold"
+                                                   Foreground="{DynamicResource TextBright}"/>
+                                        <TextBlock Name="ServerDetailText" Classes="hint"
+                                                   Text="Join a game and this fills in."/>
+                                    </StackPanel>
+                                </DockPanel>
+
+                                <Grid Margin="0,18,0,0" ColumnDefinitions="*,*,*">
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Name="ServerAddressText" Text="&#8212;" Classes="value"/>
+                                        <TextBlock Text="Address" Classes="tiny"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Name="ServerPortText" Text="&#8212;" Classes="value"/>
+                                        <TextBlock Text="Port" Classes="tiny"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Name="ServerSinceText" Text="&#8212;" Classes="value"/>
+                                        <TextBlock Text="On this one" Classes="tiny"/>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card">
+                            <StackPanel>
+                                <TextBlock Text="Why there is no ping" Classes="label"/>
+                                <TextBlock Classes="hint"
+                                           Text="Roblox puts a relay in front of every game server, and the relay does not answer a ping. Timing a connection to it measures the relay rather than the round trip you feel in game. So this says where the server is and stops there, instead of showing a number that looks like latency but is not one."/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card">
+                            <StackPanel>
+                                <TextBlock Text="Where this comes from" Classes="label"/>
+                                <TextBlock Classes="hint"
+                                           Text="Roblox writes the server's address into its own log the moment you join one. This reads that file and asks a public lookup where the address is. Nothing about you is sent, and nothing here touches the game - which is also why this page works even when Accessibility has not been granted."/>
+                            </StackPanel>
+                        </Border>
+
+                    </StackPanel>
+
+                    <!-- Scoreboard: real games, live. Rows are built in
+                         MainWindow.Scoreboard.cs rather than templated here. -->
+                    <StackPanel Name="PageScore" IsVisible="False">
+
+                        <Border Classes="hero">
+                            <StackPanel>
+                                <DockPanel LastChildFill="False">
+                                    <Button Name="ScoreRefreshButton" DockPanel.Dock="Right"
+                                            Content="Refresh" Height="38" MinWidth="110" Padding="18,0"/>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Live scores" Classes="label"/>
+                                        <TextBlock Name="ScoreHint" Classes="hint"
+                                                   Text="Real games, updating while you play."/>
+                                    </StackPanel>
+                                </DockPanel>
+
+                                <WrapPanel Name="ScoreLeaguePanel" Margin="0,14,0,0">
+                                    <RadioButton Classes="segment" GroupName="ScoreLeague"
+                                                 Tag="CollegeFootball" Content="CFB" IsChecked="True"/>
+                                    <RadioButton Classes="segment" GroupName="ScoreLeague"
+                                                 Tag="NFL" Content="NFL"/>
+                                    <RadioButton Classes="segment" GroupName="ScoreLeague"
+                                                 Tag="NBA" Content="NBA"/>
+                                    <RadioButton Classes="segment" GroupName="ScoreLeague"
+                                                 Tag="NHL" Content="NHL"/>
+                                    <RadioButton Classes="segment" GroupName="ScoreLeague"
+                                                 Tag="MLB" Content="MLB"/>
+                                </WrapPanel>
+
+                                <CheckBox Name="ScoreRankedOnly" Margin="0,14,0,0"
+                                          Content="Top 25 only"/>
+                            </StackPanel>
+                        </Border>
+
+                        <StackPanel Name="ScoreList"/>
 
                     </StackPanel>
 

@@ -164,6 +164,17 @@ public sealed class AppSettings
     /// <summary>Crosshairs the user built or imported, shown after the ready-made ones.</summary>
     public List<CustomCrosshair> CustomCrosshairs { get; set; } = new();
 
+    /// <summary>The league the Scoreboard page opens on, by name.</summary>
+    /// <remarks>
+    /// Stored as the name rather than the number so that reordering
+    /// <see cref="ScoreLeague"/> cannot silently move everybody to a different
+    /// sport, which is what storing an enum by its ordinal does.
+    /// </remarks>
+    public string ScoreLeague { get; set; } = "CollegeFootball";
+
+    /// <summary>Whether the Scoreboard shows only ranked college games.</summary>
+    public bool ScoreTop25 { get; set; }
+
     /// <summary>The highest aim-practice score on this machine.</summary>
     /// <remarks>
     /// One number rather than a table of rounds: the point is having something

@@ -168,6 +168,8 @@ public partial class MainWindow : Window
         WireDiagnostics();
         WireTweaks();
         WireAimTrainer();
+        WireServer();
+        WireScoreboard();
         WireMacros();
         WireSwitcher();
         WireMacroBadge();
@@ -265,6 +267,8 @@ public partial class MainWindow : Window
         Wire(NavCrosshair, PageCrosshair, "Crosshair", "A crosshair in place of Roblox's cursor");
         Wire(NavPerformance, PagePerformance, "Performance", "Roblox's own settings, for more frames");
         Wire(NavAim, PageAim, "Aim Trainer", "Practice the part the clicker cannot do for you");
+        Wire(NavServer, PageServer, "Server", "Which game server you are on, and where it is");
+        Wire(NavScore, PageScore, "Scoreboard", "Live scores while you play");
         Wire(NavHistory, PageHistory, "History", "Time spent clicking, and how much of it landed");
         Wire(NavTheme, PageTheme, "Theme", "Accent colour");
         Wire(NavSettings, PageSettings, "Settings", "Where things are stored, and what this build can do");
@@ -288,6 +292,8 @@ public partial class MainWindow : Window
         PageCrosshair.IsVisible = ReferenceEquals(page, PageCrosshair);
         PagePerformance.IsVisible = ReferenceEquals(page, PagePerformance);
         PageAim.IsVisible = ReferenceEquals(page, PageAim);
+        PageServer.IsVisible = ReferenceEquals(page, PageServer);
+        PageScore.IsVisible = ReferenceEquals(page, PageScore);
         PageMacros.IsVisible = ReferenceEquals(page, PageMacros);
         PageSwitcher.IsVisible = ReferenceEquals(page, PageSwitcher);
 
@@ -320,6 +326,12 @@ public partial class MainWindow : Window
         // A round left running on a page nobody is looking at would tick, miss
         // every target and wreck the score, so leaving ends it.
         if (!ReferenceEquals(page, PageAim)) LeavingAimTrainer();
+
+        // Both of these poll while they are open — one reads Roblox's log, the
+        // other fetches a scoreboard — so arriving starts the polling and
+        // leaving stops it, rather than an idle app quietly doing both forever.
+        if (ReferenceEquals(page, PageServer)) EnterServer(); else LeavingServer();
+        if (ReferenceEquals(page, PageScore)) EnterScoreboard(); else LeavingScoreboard();
 
         if (ReferenceEquals(page, PageKitWheel))
         {
@@ -1243,6 +1255,7 @@ public partial class MainWindow : Window
 
         LoadCrosshair(_settings);
         LoadAimTrainer(_settings);
+        LoadScoreboard(_settings);
 
         // Clamped to the minimums the window declares. A stored size from a
         // larger monitor is only a problem if it is honoured blindly, and a

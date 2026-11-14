@@ -21,6 +21,14 @@
     <Compile Include="../Core/CrosshairGallery.cs" />
     <Compile Include="../Core/AimTrainer.cs" />
     <Compile Include="../Core/AimTrainer.Tests.cs" />
+    <Compile Include="../Core/SportsScores.cs" />
+    <Compile Include="../Core/SportsScores.Tests.cs" />
+    <Compile Include="../Core/ServerRegion.cs" />
+    <Compile Include="../Core/ServerRegion.Tests.cs" />
+    <Compile Include="../Core/RobloxServerLog.cs" />
+    <Compile Include="../Core/RobloxServerLog.Tests.cs" />
+    <Compile Include="../Core/IpRegionLookup.cs" />
+    <Compile Include="../Core/IpRegionLookup.Tests.cs" />
     <Compile Include="../Core/RobloxFastFlags.cs" />
     <Compile Include="../Core/RobloxFastFlags.Tests.cs" />
     <Compile Include="../Core/RobloxCursors.cs" />
