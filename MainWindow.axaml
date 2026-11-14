@@ -263,6 +263,7 @@
                     <RadioButton Classes="nav" GroupName="Nav" Content="Kit Wheel" Name="NavKitWheel"/>
                     <RadioButton Classes="nav" GroupName="Nav" Content="Crosshair" Name="NavCrosshair"/>
                     <RadioButton Classes="nav" GroupName="Nav" Content="Performance" Name="NavPerformance"/>
+                    <RadioButton Classes="nav" GroupName="Nav" Content="Aim Trainer" Name="NavAim"/>
                     <RadioButton Classes="nav" GroupName="Nav" Content="History" Name="NavHistory"/>
                     <RadioButton Classes="nav" GroupName="Nav" Content="Theme" Name="NavTheme"/>
                     <RadioButton Classes="nav" GroupName="Nav" Content="Settings" Name="NavSettings"/>
@@ -1049,6 +1050,72 @@
 
                                 <TextBlock Classes="hint" Margin="0,12,0,0" TextWrapping="Wrap" HorizontalAlignment="Left" MaxWidth="620"
                                            Text="These are Roblox's own settings, the ones it publishes as fair to change. Nothing here touches how your character moves. A Roblox update replaces them, so come back and apply again after one."/>
+                            </StackPanel>
+                        </Border>
+
+                    </StackPanel>
+
+                    <!-- Aim Trainer: practice for the part the clicker cannot do
+                         for you. Needs no permissions. See MainWindow.AimTrainer.cs. -->
+                    <StackPanel Name="PageAim" IsVisible="False">
+
+                        <Border Classes="hero">
+                            <StackPanel>
+                                <DockPanel LastChildFill="False">
+                                    <Button Name="AimStartButton" DockPanel.Dock="Right" Classes="accent"
+                                            Content="Start" Height="38" MinWidth="110" Padding="18,0"/>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Practice" Classes="label"/>
+                                        <TextBlock Name="AimHint" Classes="hint"
+                                                   Text="Thirty seconds. Click each target as it appears."/>
+                                    </StackPanel>
+                                </DockPanel>
+
+                                <WrapPanel Name="AimLevelPanel" Margin="0,14,0,0">
+                                    <RadioButton Classes="segment" GroupName="AimLevel" Tag="Easy" Content="Easy"/>
+                                    <RadioButton Classes="segment" GroupName="AimLevel" Tag="Normal" Content="Normal" IsChecked="True"/>
+                                    <RadioButton Classes="segment" GroupName="AimLevel" Tag="Hard" Content="Hard"/>
+                                </WrapPanel>
+
+                                <Grid Margin="0,16,0,0" ColumnDefinitions="*,*,*,*,*,*">
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Name="AimTimeText" Text="30s" Classes="value"/>
+                                        <TextBlock Text="Left" Classes="tiny"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Name="AimHitsText" Text="0" Classes="value"/>
+                                        <TextBlock Text="Hits" Classes="tiny"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Name="AimAccuracyText" Text="0%" Classes="value"/>
+                                        <TextBlock Text="Accuracy" Classes="tiny"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="3">
+                                        <TextBlock Name="AimReactionText" Text="&#8212;" Classes="value"/>
+                                        <TextBlock Text="Reaction" Classes="tiny"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="4">
+                                        <TextBlock Name="AimScoreText" Text="0" Classes="value"/>
+                                        <TextBlock Text="Score" Classes="tiny"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="5">
+                                        <TextBlock Name="AimBestText" Text="0" Classes="value"/>
+                                        <TextBlock Text="Best" Classes="tiny"/>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card" Padding="0" Height="420">
+                            <Canvas Name="AimArea" Background="{DynamicResource Sunken}"
+                                    ClipToBounds="True"/>
+                        </Border>
+
+                        <Border Classes="card">
+                            <StackPanel>
+                                <TextBlock Text="How it is scored" Classes="label"/>
+                                <TextBlock Classes="hint"
+                                           Text="A target left too long counts as a miss, so waiting is not free. Faster hits and smaller targets score higher - clicking a slow, easy target many times should not beat a fast, hard one."/>
                             </StackPanel>
                         </Border>
 

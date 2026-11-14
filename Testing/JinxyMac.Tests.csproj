@@ -19,6 +19,8 @@
     <Compile Include="../Core/CrosshairStyle.cs" />
     <Compile Include="../Core/CrosshairStyle.Tests.cs" />
     <Compile Include="../Core/CrosshairGallery.cs" />
+    <Compile Include="../Core/AimTrainer.cs" />
+    <Compile Include="../Core/AimTrainer.Tests.cs" />
     <Compile Include="../Core/RobloxFastFlags.cs" />
     <Compile Include="../Core/RobloxFastFlags.Tests.cs" />
     <Compile Include="../Core/RobloxCursors.cs" />

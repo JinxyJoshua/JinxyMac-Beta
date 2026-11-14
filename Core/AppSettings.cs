@@ -164,6 +164,13 @@ public sealed class AppSettings
     /// <summary>Crosshairs the user built or imported, shown after the ready-made ones.</summary>
     public List<CustomCrosshair> CustomCrosshairs { get; set; } = new();
 
+    /// <summary>The highest aim-practice score on this machine.</summary>
+    /// <remarks>
+    /// One number rather than a table of rounds: the point is having something
+    /// to beat, and a history of every round would be a page nobody opens.
+    /// </remarks>
+    public int AimBest { get; set; }
+
     public double? WindowWidth { get; set; }
     public double? WindowHeight { get; set; }
 

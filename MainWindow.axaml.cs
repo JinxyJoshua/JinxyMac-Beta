@@ -167,6 +167,7 @@ public partial class MainWindow : Window
         WireCrosshair();
         WireDiagnostics();
         WireTweaks();
+        WireAimTrainer();
         WireMacros();
         WireSwitcher();
         WireMacroBadge();
@@ -263,6 +264,7 @@ public partial class MainWindow : Window
         Wire(NavKitWheel, PageKitWheel, "Kit Wheel", "Roll a kit you have not played yet");
         Wire(NavCrosshair, PageCrosshair, "Crosshair", "A crosshair in place of Roblox's cursor");
         Wire(NavPerformance, PagePerformance, "Performance", "Roblox's own settings, for more frames");
+        Wire(NavAim, PageAim, "Aim Trainer", "Practice the part the clicker cannot do for you");
         Wire(NavHistory, PageHistory, "History", "Time spent clicking, and how much of it landed");
         Wire(NavTheme, PageTheme, "Theme", "Accent colour");
         Wire(NavSettings, PageSettings, "Settings", "Where things are stored, and what this build can do");
@@ -285,6 +287,7 @@ public partial class MainWindow : Window
         PageKitWheel.IsVisible = ReferenceEquals(page, PageKitWheel);
         PageCrosshair.IsVisible = ReferenceEquals(page, PageCrosshair);
         PagePerformance.IsVisible = ReferenceEquals(page, PagePerformance);
+        PageAim.IsVisible = ReferenceEquals(page, PageAim);
         PageMacros.IsVisible = ReferenceEquals(page, PageMacros);
         PageSwitcher.IsVisible = ReferenceEquals(page, PageSwitcher);
 
@@ -313,6 +316,10 @@ public partial class MainWindow : Window
         // silently resets these, so a remembered answer would be wrong exactly
         // when it matters.
         if (ReferenceEquals(page, PagePerformance)) RefreshTweaks();
+
+        // A round left running on a page nobody is looking at would tick, miss
+        // every target and wreck the score, so leaving ends it.
+        if (!ReferenceEquals(page, PageAim)) LeavingAimTrainer();
 
         if (ReferenceEquals(page, PageKitWheel))
         {
@@ -1235,6 +1242,7 @@ public partial class MainWindow : Window
         _loading = true;
 
         LoadCrosshair(_settings);
+        LoadAimTrainer(_settings);
 
         // Clamped to the minimums the window declares. A stored size from a
         // larger monitor is only a problem if it is honoured blindly, and a
