@@ -253,7 +253,9 @@
                                Foreground="{DynamicResource Accent}" Margin="0,3,0,0"/>
                 </StackPanel>
 
-                <StackPanel DockPanel.Dock="Top">
+                <!-- Named because MainWindow.NavCustomize.cs takes these
+                     buttons out and puts them back in the user's own order. -->
+                <StackPanel Name="NavList" DockPanel.Dock="Top">
                     <RadioButton Classes="nav" GroupName="Nav" Content="Clicker"
                                  IsChecked="True" Name="NavClicker"/>
                     <RadioButton Classes="nav" GroupName="Nav" Content="Presets" Name="NavPresets"/>
@@ -1377,6 +1379,23 @@
 
                     <!-- Settings -->
                     <StackPanel Name="PageSettings" IsVisible="False">
+
+                        <Border Classes="card">
+                            <StackPanel>
+                                <DockPanel LastChildFill="False">
+                                    <Button Name="NavResetButton" DockPanel.Dock="Right"
+                                            Content="Reset" Height="34" MinWidth="88"
+                                            Padding="14,0" VerticalAlignment="Center"/>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Sidebar" Classes="label"/>
+                                        <TextBlock Classes="hint"
+                                                   Text="Untick a page to take it out of the sidebar, move it with the arrows, or type over its name. Hiding a page turns nothing off - a macro or a clicker already running carries on."/>
+                                    </StackPanel>
+                                </DockPanel>
+
+                                <StackPanel Name="NavEditorList" Margin="0,16,0,0"/>
+                            </StackPanel>
+                        </Border>
 
                         <Border Classes="card">
                             <StackPanel>

@@ -164,6 +164,22 @@ public sealed class AppSettings
     /// <summary>Crosshairs the user built or imported, shown after the ready-made ones.</summary>
     public List<CustomCrosshair> CustomCrosshairs { get; set; } = new();
 
+    /// <summary>The sidebar order, as page ids.</summary>
+    /// <remarks>
+    /// Ids rather than names, so renaming what a page is called cannot scramble
+    /// the order. Empty means the order the app ships with; see
+    /// <c>NavLayout.Reconcile</c> for how this is merged with the pages that
+    /// exist now, which is what lets an order saved by an older build survive an
+    /// update that adds or removes a page.
+    /// </remarks>
+    public List<string> NavOrder { get; set; } = new();
+
+    /// <summary>Page ids taken out of the sidebar.</summary>
+    public List<string> NavHidden { get; set; } = new();
+
+    /// <summary>Page ids the user renamed, and what to.</summary>
+    public Dictionary<string, string> NavLabels { get; set; } = new();
+
     /// <summary>The league the Scoreboard page opens on, by name.</summary>
     /// <remarks>
     /// Stored as the name rather than the number so that reordering

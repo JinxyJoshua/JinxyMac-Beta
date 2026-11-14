@@ -170,6 +170,7 @@ public partial class MainWindow : Window
         WireAimTrainer();
         WireServer();
         WireScoreboard();
+        WireNavCustomize();
         WireMacros();
         WireSwitcher();
         WireMacroBadge();
@@ -1256,6 +1257,12 @@ public partial class MainWindow : Window
         LoadCrosshair(_settings);
         LoadAimTrainer(_settings);
         LoadScoreboard(_settings);
+
+        // Last of the loading, because it moves the sidebar buttons about and
+        // may tick a different one: everything those handlers reach has to be
+        // loaded by the time it does.
+        ApplyNavLayout();
+        BuildNavEditor();
 
         // Clamped to the minimums the window declares. A stored size from a
         // larger monitor is only a problem if it is honoured blindly, and a

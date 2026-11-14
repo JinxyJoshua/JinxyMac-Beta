@@ -29,6 +29,8 @@
     <Compile Include="../Core/RobloxServerLog.Tests.cs" />
     <Compile Include="../Core/IpRegionLookup.cs" />
     <Compile Include="../Core/IpRegionLookup.Tests.cs" />
+    <Compile Include="../Core/NavLayout.cs" />
+    <Compile Include="../Core/NavLayout.Tests.cs" />
     <Compile Include="../Core/RobloxFastFlags.cs" />
     <Compile Include="../Core/RobloxFastFlags.Tests.cs" />
     <Compile Include="../Core/RobloxCursors.cs" />
