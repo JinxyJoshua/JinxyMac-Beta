@@ -164,6 +164,14 @@ public sealed class AppSettings
     /// <summary>Crosshairs the user built or imported, shown after the ready-made ones.</summary>
     public List<CustomCrosshair> CustomCrosshairs { get; set; } = new();
 
+    /// <summary>Flag names written here by importing somebody's preset.</summary>
+    /// <remarks>
+    /// Recorded because they are in no fixed list in the app, so Restore would
+    /// otherwise clear the settings Jinxy offers and leave an imported preset
+    /// behind — which is not what putting it back means.
+    /// </remarks>
+    public List<string> ImportedFlags { get; set; } = new();
+
     /// <summary>The sidebar order, as page ids.</summary>
     /// <remarks>
     /// Ids rather than names, so renaming what a page is called cannot scramble

@@ -171,6 +171,7 @@ public partial class MainWindow : Window
         WireServer();
         WireScoreboard();
         WireNavCustomize();
+        WireFlagImport();
         WireMacros();
         WireSwitcher();
         WireMacroBadge();

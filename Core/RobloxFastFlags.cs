@@ -326,14 +326,20 @@ public sealed class RobloxFastFlags
         }
     }
 
-    /// <summary>Whether anything this app writes is currently in the file.</summary>
-    public bool AnythingApplied()
+    /// <summary>Whether anything this app put there is currently in the file.</summary>
+    /// <param name="alsoCount">
+    /// Names imported from a pasted preset, which the caller records. Without
+    /// them the page would report nothing applied while an imported preset was
+    /// sitting in the file.
+    /// </param>
+    public bool AnythingApplied(IEnumerable<string>? alsoCount = null)
     {
         Dictionary<string, string> current = Read();
 
         return current.ContainsKey(SkyGrayFlag)
                || FpsBoost.Any(f => current.ContainsKey(f.Name))
-               || DeadFlags.Any(current.ContainsKey);
+               || DeadFlags.Any(current.ContainsKey)
+               || (alsoCount?.Any(current.ContainsKey) ?? false);
     }
 
     /// <summary>
@@ -345,7 +351,12 @@ public sealed class RobloxFastFlags
     /// which leaves a file the user built elsewhere intact rather than deleting
     /// settings that were never ours.
     /// </remarks>
-    public bool Restore()
+    /// <param name="alsoClear">
+    /// Names imported from a pasted preset. They are not in any fixed list here,
+    /// so the caller passes what it recorded — otherwise "put it back" would
+    /// clear the settings this app offers and leave an imported preset behind.
+    /// </param>
+    public bool Restore(IEnumerable<string>? alsoClear = null)
     {
         string? path = SettingsPath();
         if (path == null) return false;
@@ -367,6 +378,8 @@ public sealed class RobloxFastFlags
             // The dead ones too: a flag this app wrote is this app's to tidy up,
             // whether or not Roblox was ever going to read it.
             ours.AddRange(DeadFlags);
+
+            if (alsoClear != null) ours.AddRange(alsoClear);
 
             return Clear(ours);
         }

@@ -36,7 +36,19 @@ public partial class MainWindow
         GraySkyButton.Click += (_, _) => ToggleGraySky();
 
         RestoreTweaksButton.Click += (_, _) =>
-            ReportTweaks(_flags.Restore(), "Roblox's own settings are back.");
+        {
+            // Imported names go with it: they are in no fixed list here, so
+            // without them "put it back" would leave a pasted preset behind.
+            bool worked = _flags.Restore(_settings.ImportedFlags);
+
+            if (worked && _settings.ImportedFlags.Count > 0)
+            {
+                _settings.ImportedFlags.Clear();
+                _settings.Save();
+            }
+
+            ReportTweaks(worked, "Roblox's own settings are back.");
+        };
 
         ClearDeadFlagsButton.Click += (_, _) =>
             ReportTweaks(_flags.ClearDeadFlags(), "The old frame-rate entry has been taken out.");
@@ -86,7 +98,7 @@ public partial class MainWindow
 
         DeadFlagNotice.IsVisible = dead.Count > 0;
 
-        TweaksStatus.Text = _flags.AnythingApplied()
+        TweaksStatus.Text = _flags.AnythingApplied(_settings.ImportedFlags)
             ? "Settings applied. Quit Roblox and open it again for them to take effect."
             : "Nothing applied — Roblox is running on its own settings.";
     }

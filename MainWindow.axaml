@@ -1041,6 +1041,45 @@
                             </StackPanel>
                         </Border>
 
+                        <!-- Importing somebody else's preset. The verdict is the
+                             point: most of what circulates is inert since
+                             Roblox's allowlist. See MainWindow.FlagImport.cs. -->
+                        <Border Classes="card">
+                            <StackPanel>
+                                <DockPanel LastChildFill="False">
+                                    <Button Name="ExportFlagsButton" DockPanel.Dock="Right"
+                                            Content="Copy mine" Height="34" MinWidth="104"
+                                            Padding="14,0" VerticalAlignment="Center"/>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Import a preset" Classes="label"/>
+                                        <TextBlock Classes="hint"
+                                                   Text="Paste a set of Roblox flags and Jinxy will tell you which ones Roblox actually uses before writing anything. Most presets passed around are mostly settings Roblox stopped reading in September 2025."/>
+                                    </StackPanel>
+                                </DockPanel>
+
+                                <TextBox Name="ImportFlagsBox" Margin="0,14,0,0"
+                                         Height="128" AcceptsReturn="True" TextWrapping="NoWrap"
+                                         FontFamily="Menlo, Monaco, monospace" FontSize="12"
+                                         VerticalContentAlignment="Top"
+                                         Watermark="{}{ &quot;DFIntTextureQualityOverride&quot;: &quot;0&quot; }"/>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0" Spacing="10">
+                                    <Button Name="ImportFlagsCheckButton" Classes="accent"
+                                            Content="Check" Height="38" MinWidth="104" Padding="16,0"/>
+                                    <Button Name="ImportFlagsApplyButton" Content="Nothing to apply"
+                                            Height="38" MinWidth="132" Padding="16,0" IsEnabled="False"/>
+                                    <Button Name="ImportFlagsClearButton" Content="Clear"
+                                            Height="38" MinWidth="84" Padding="16,0"/>
+                                </StackPanel>
+
+                                <StackPanel Name="ImportFlagsResult" IsVisible="False" Margin="0,14,0,0">
+                                    <TextBlock Name="ImportFlagsSummary" FontSize="14" FontWeight="SemiBold"
+                                               TextWrapping="Wrap" MaxWidth="620"/>
+                                    <StackPanel Name="ImportFlagsDetail"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
                         <Border Classes="card">
                             <StackPanel>
                                 <DockPanel LastChildFill="False">
