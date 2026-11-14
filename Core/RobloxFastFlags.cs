@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -68,23 +67,99 @@ public sealed class RobloxFastFlags
     /// not depend on any permission: it is a file write, so it works even while
     /// Accessibility is refusing the clicker.
     /// </remarks>
-    public const string FpsCapFlagName = "DFIntTaskSchedulerTargetFps";
+    /// <summary>
+    /// Every flag Roblox still honours from a local settings file.
+    /// </summary>
+    /// <remarks>
+    /// Roblox restricted local client configuration to an allowlist on
+    /// 29 September 2025. A flag outside it is <b>ignored in silence</b> — the
+    /// file is still read, the entry is still there, and nothing happens. No
+    /// error, no warning, nothing to notice.
+    ///
+    /// <para>That silence is exactly how this app shipped a frame-rate setting
+    /// that never worked: it wrote the flag, read it back, found it, and
+    /// reported success — because reading back your own write only proves that
+    /// you wrote it. The list is kept here so that "will Roblox act on this?"
+    /// has an answer in code, and <c>RobloxFastFlagsTests</c> fails the build if
+    /// anything this app writes is not on it.</para>
+    ///
+    /// <para>Roblox says the list may change without warning, so this is a
+    /// snapshot of the published one rather than a guarantee. Flags on it that
+    /// macOS cannot use — the Direct3D, Vulkan and OpenGL backend preferences,
+    /// and the alt-enter fullscreen handling — are listed for completeness and
+    /// are not written by this app.</para>
+    /// </remarks>
+    public static IReadOnlySet<string> Allowlist { get; } =
+        new HashSet<string>(StringComparer.Ordinal)
+        {
+            // Geometry
+            "DFIntCSGLevelOfDetailSwitchingDistance",
+            "DFIntCSGLevelOfDetailSwitchingDistanceL12",
+            "DFIntCSGLevelOfDetailSwitchingDistanceL23",
+            "DFIntCSGLevelOfDetailSwitchingDistanceL34",
 
-    /// <summary>Above any display refresh, for an effectively uncapped target.</summary>
-    public const int UnlimitedFps = 9999;
+            // Rendering
+            "FFlagHandleAltEnterFullscreenManually",
+            "DFFlagTextureQualityOverrideEnabled",
+            "DFIntTextureQualityOverride",
+            "FIntDebugForceMSAASamples",
+            "DFFlagDisableDPIScale",
+            "FFlagDebugGraphicsPreferD3D11",
+            "FFlagDebugSkyGray",
+            "DFFlagDebugPauseVoxelizer",
+            "DFIntDebugFRMQualityLevelOverride",
+            "FIntFRMMaxGrassDistance",
+            "FIntFRMMinGrassDistance",
+            "FFlagDebugGraphicsPreferVulkan",
+            "FFlagDebugGraphicsPreferOpenGL",
+
+            // User interface
+            "FIntGrassMovementReducedMotionFactor"
+        };
+
+    /// <summary>
+    /// Flags this app used to write that Roblox does not act on.
+    /// </summary>
+    /// <remarks>
+    /// <c>DFIntTaskSchedulerTargetFps</c> was the frame-rate target, and the
+    /// headline of this page in 1.2.8. It is not on the allowlist and has done
+    /// nothing since September 2025; a request to have it added is unanswered.
+    ///
+    /// <para>Named here rather than simply deleted, for two reasons. Anyone who
+    /// used that version has the entry sitting in their settings file and should
+    /// be told it is inert rather than left believing in it. And naming it stops
+    /// it being reintroduced by somebody reading one of the many guides that
+    /// still recommend it.</para>
+    /// </remarks>
+    public static IReadOnlyList<string> DeadFlags { get; } = new[]
+    {
+        "DFIntTaskSchedulerTargetFps"
+    };
 
     /// <summary>
     /// The FPS-boost set: less for the machine to draw, so the frames it can
     /// draw come faster.
     /// </summary>
     /// <remarks>
-    /// Ported unchanged from the Windows build apart from the graphics-backend
-    /// flags, which are Direct3D, Vulkan and OpenGL — none of which macOS uses.
-    /// There is no Metal equivalent on the allowlist, so that choice is simply
-    /// absent here rather than faked.
+    /// Ported from the Windows build apart from the graphics-backend flags,
+    /// which are Direct3D, Vulkan and OpenGL — none of which macOS uses. There
+    /// is no Metal equivalent on the allowlist, so that choice is simply absent
+    /// here rather than faked.
+    ///
+    /// <para>Every flag in here is on <see cref="Allowlist"/>, which is the only
+    /// reason any of it does anything. This is the half of the page that works:
+    /// the frame-rate target that used to sit above it did not.</para>
     /// </remarks>
     public static IReadOnlyList<FastFlag> FpsBoost { get; } = new[]
     {
+        new FastFlag("DFIntCSGLevelOfDetailSwitchingDistance", "1",
+            "Unioned parts drop to simpler shapes immediately rather than at distance."),
+        new FastFlag("DFIntCSGLevelOfDetailSwitchingDistanceL12", "1",
+            "The same, for the next level of detail down."),
+        new FastFlag("DFIntCSGLevelOfDetailSwitchingDistanceL23", "1",
+            "And the next."),
+        new FastFlag("DFIntCSGLevelOfDetailSwitchingDistanceL34", "1",
+            "And the last, so the simplest shape is used throughout."),
         new FastFlag("DFFlagTextureQualityOverrideEnabled", "True",
             "Lets the texture quality below be applied at all."),
         new FastFlag("DFIntTextureQualityOverride", "0",
@@ -206,30 +281,24 @@ public sealed class RobloxFastFlags
         }
     }
 
-    /// <summary>Sets the frame-rate target, or clears it for the client's own 60.</summary>
+    /// <summary>
+    /// Flags left in the file that Roblox ignores.
+    /// </summary>
     /// <remarks>
-    /// 60 or below is the default and is stored as no flag at all rather than as
-    /// the number 60 — writing the default would leave a setting behind that
-    /// looks deliberate and outlives the reason for it.
+    /// Only ever written by an older version of this app. Reported rather than
+    /// quietly deleted, because somebody who set a frame-rate target in 1.2.8 is
+    /// owed the news that it never did anything.
     /// </remarks>
-    public bool SetFpsCap(int? fps)
+    public IReadOnlyList<string> DeadFlagsPresent()
     {
-        if (fps is null or <= 60) return Clear(new[] { FpsCapFlagName });
+        Dictionary<string, string> current = Read();
 
-        return Apply(new[]
-        {
-            new FastFlag(FpsCapFlagName,
-                fps.Value.ToString(CultureInfo.InvariantCulture),
-                "Frame-rate target. Roblox renders up to this many FPS.")
-        });
+        return DeadFlags.Where(current.ContainsKey).ToList();
     }
 
-    /// <summary>The target in the file, or null when the client's 60 applies.</summary>
-    public int? CurrentFpsCap() =>
-        Read().TryGetValue(FpsCapFlagName, out string? value)
-        && int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int fps)
-            ? fps
-            : null;
+    /// <summary>Removes the flags Roblox ignores, if any are there.</summary>
+    public bool ClearDeadFlags() =>
+        DeadFlagsPresent().Count > 0 && Clear(DeadFlags);
 
     /// <summary>
     /// Copies the client's own settings aside, once.
@@ -262,9 +331,9 @@ public sealed class RobloxFastFlags
     {
         Dictionary<string, string> current = Read();
 
-        return current.ContainsKey(FpsCapFlagName)
-               || current.ContainsKey(SkyGrayFlag)
-               || FpsBoost.Any(f => current.ContainsKey(f.Name));
+        return current.ContainsKey(SkyGrayFlag)
+               || FpsBoost.Any(f => current.ContainsKey(f.Name))
+               || DeadFlags.Any(current.ContainsKey);
     }
 
     /// <summary>
@@ -292,8 +361,12 @@ public sealed class RobloxFastFlags
                 return true;
             }
 
-            var ours = new List<string> { FpsCapFlagName, SkyGrayFlag };
+            var ours = new List<string> { SkyGrayFlag };
             ours.AddRange(FpsBoost.Select(f => f.Name));
+
+            // The dead ones too: a flag this app wrote is this app's to tidy up,
+            // whether or not Roblox was ever going to read it.
+            ours.AddRange(DeadFlags);
 
             return Clear(ours);
         }

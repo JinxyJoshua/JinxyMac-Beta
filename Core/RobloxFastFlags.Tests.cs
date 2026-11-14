@@ -65,49 +65,125 @@ public class RobloxFastFlagsTests : IDisposable
         Assert.False(flags.Apply(RobloxFastFlags.FpsBoost));
     }
 
-    // ---- the frame rate, which is the point of the feature ----
+    // ---- the allowlist, which decides whether any of this does anything ----
 
+    /// <summary>
+    /// The guard that the frame-rate setting needed and did not have.
+    /// </summary>
+    /// <remarks>
+    /// Roblox limited local settings to an approved list in September 2025 and
+    /// ignores anything else <em>in silence</em> — no error, nothing in the file
+    /// to see. So writing a flag and reading it back proves only that you wrote
+    /// it, which is precisely how 1.2.8 shipped a frame-rate target that did
+    /// nothing and reported success.
+    ///
+    /// <para>This fails the build instead. Anything offered on the Performance
+    /// page has to be a flag Roblox will actually act on.</para>
+    /// </remarks>
     [Fact]
-    public void SettingTheFrameRateWritesTheTargetRobloxReads()
+    public void EverySettingTheAppWritesIsOneRobloxWillActOn()
     {
-        var flags = Flags();
+        var written = new List<string> { RobloxFastFlags.SkyGrayFlag };
+        written.AddRange(RobloxFastFlags.FpsBoost.Select(f => f.Name));
 
-        Assert.True(flags.SetFpsCap(240));
+        List<string> ignored = written
+            .Where(name => !RobloxFastFlags.Allowlist.Contains(name))
+            .ToList();
 
-        Assert.Equal(240, flags.CurrentFpsCap());
-        Assert.Equal("240", flags.Read()[RobloxFastFlags.FpsCapFlagName]);
+        Assert.True(ignored.Count == 0,
+            "Roblox ignores these, so offering them would promise nothing: "
+            + string.Join(", ", ignored));
     }
 
     /// <summary>
-    /// 60 and below is the client's own behaviour, so it is stored as nothing at
-    /// all. Writing "60" would leave a setting behind that looks deliberate and
-    /// outlives the reason for it.
+    /// And the other half of the same guard: the flags recorded as dead really
+    /// are off the list. If Roblox ever approves one, this fails and says so,
+    /// which is the signal to offer it again.
     /// </summary>
-    [Theory]
-    [InlineData(60)]
-    [InlineData(30)]
-    [InlineData(null)]
-    public void TheDefaultFrameRateIsStoredAsNoSettingAtAll(int? fps)
+    [Fact]
+    public void TheFlagsRecordedAsDeadAreTheOnesRobloxIgnores()
     {
-        var flags = Flags();
-        flags.SetFpsCap(240);
+        Assert.NotEmpty(RobloxFastFlags.DeadFlags);
 
-        flags.SetFpsCap(fps);
+        List<string> nowAllowed = RobloxFastFlags.DeadFlags
+            .Where(RobloxFastFlags.Allowlist.Contains)
+            .ToList();
 
-        Assert.Null(flags.CurrentFpsCap());
-        Assert.False(flags.Read().ContainsKey(RobloxFastFlags.FpsCapFlagName));
+        Assert.True(nowAllowed.Count == 0,
+            "Roblox now allows these, so they could be offered again: "
+            + string.Join(", ", nowAllowed));
+    }
+
+    /// <summary>The frame-rate target by name, so its removal cannot be undone quietly.</summary>
+    [Fact]
+    public void TheFrameRateTargetIsNotOffered()
+    {
+        Assert.Contains("DFIntTaskSchedulerTargetFps", RobloxFastFlags.DeadFlags);
+
+        Assert.DoesNotContain("DFIntTaskSchedulerTargetFps",
+            RobloxFastFlags.FpsBoost.Select(f => f.Name));
+    }
+
+    // ---- clearing up after the version that wrote it ----
+
+    [Fact]
+    public void AnOldFrameRateEntryIsNoticed()
+    {
+        var flags = Flags(OldVersionsFile());
+
+        Assert.Equal(new[] { "DFIntTaskSchedulerTargetFps" }, flags.DeadFlagsPresent());
     }
 
     [Fact]
-    public void ChangingTheFrameRateReplacesItRatherThanAddingToIt()
+    public void AnOldFrameRateEntryCanBeTakenOut()
+    {
+        var flags = Flags(OldVersionsFile());
+
+        Assert.True(flags.ClearDeadFlags());
+
+        Assert.Empty(flags.DeadFlagsPresent());
+        Assert.False(flags.Read().ContainsKey("DFIntTaskSchedulerTargetFps"));
+    }
+
+    /// <summary>
+    /// Nothing to clear is not a failure, and must not be reported as having
+    /// done something.
+    /// </summary>
+    [Fact]
+    public void WithNoOldEntryThereIsNothingToTakeOut()
     {
         var flags = Flags();
 
-        flags.SetFpsCap(120);
-        flags.SetFpsCap(RobloxFastFlags.UnlimitedFps);
-
-        Assert.Equal(RobloxFastFlags.UnlimitedFps, flags.CurrentFpsCap());
+        Assert.False(flags.ClearDeadFlags());
+        Assert.Empty(flags.DeadFlagsPresent());
     }
+
+    /// <summary>Taking it out leaves everything else in the file alone.</summary>
+    [Fact]
+    public void TakingOutTheOldEntryKeepsTheRest()
+    {
+        var file = OldVersionsFile();
+        file["FFlagSomethingOfTheirs"] = "True";
+
+        var flags = Flags(file);
+        flags.ClearDeadFlags();
+
+        Assert.Equal("True", flags.Read()["FFlagSomethingOfTheirs"]);
+    }
+
+    /// <summary>
+    /// A dead entry still counts as something this app put there, so the page
+    /// does not claim nothing is applied while one sits in the file.
+    /// </summary>
+    [Fact]
+    public void AnOldFrameRateEntryCountsAsSomethingApplied()
+    {
+        Assert.True(Flags(OldVersionsFile()).AnythingApplied());
+    }
+
+    /// <summary>A settings file as version 1.2.8 would have left it.</summary>
+    private static Dictionary<string, string> OldVersionsFile() =>
+        new() { ["DFIntTaskSchedulerTargetFps"] = "9999" };
 
     // ---- living in someone else's file ----
 
@@ -132,7 +208,11 @@ public class RobloxFastFlagsTests : IDisposable
         var flags = Flags(before);
 
         flags.Apply(RobloxFastFlags.FpsBoost);
-        flags.SetFpsCap(240);
+
+        // Written the way 1.2.8 wrote it, so Restore is shown to clear up after
+        // that version too rather than leaving its dead entry behind.
+        flags.Apply(new[] { new FastFlag("DFIntTaskSchedulerTargetFps", "9999", "") });
+
         Assert.True(flags.Restore());
 
         Dictionary<string, string> after = flags.Read();
@@ -168,7 +248,6 @@ public class RobloxFastFlagsTests : IDisposable
         var flags = Flags();
 
         flags.Apply(RobloxFastFlags.FpsBoost);
-        flags.SetFpsCap(144);
 
         // Something arriving after this app first wrote, so it is not in any backup.
         Dictionary<string, string> withTheirs = flags.Read();
@@ -211,7 +290,7 @@ public class RobloxFastFlagsTests : IDisposable
 
         Assert.False(flags.AnythingApplied());
 
-        flags.SetFpsCap(120);
+        flags.Apply(RobloxFastFlags.FpsBoost);
         Assert.True(flags.AnythingApplied());
 
         flags.Restore();

@@ -999,28 +999,14 @@
                          Mac client reads them. See MainWindow.Tweaks.cs. -->
                     <StackPanel Name="PagePerformance" IsVisible="False">
 
+                        <!-- "Less to draw" is the hero because it is the half of
+                             this page that works. The frame-rate target that used
+                             to sit above it did not - see the card below. -->
                         <Border Classes="hero">
-                            <StackPanel>
-                                <TextBlock Text="Frame rate" Classes="label"/>
-                                <TextBlock Classes="hint" TextWrapping="Wrap" HorizontalAlignment="Left" MaxWidth="620"
-                                           Text="Roblox on a Mac draws 60 frames a second unless it is told otherwise. Raising this is the single biggest difference you can feel, and it does not need any permission - so it works even if the clicker says BLOCKED."/>
-                                <WrapPanel Name="FpsChoicePanel" Margin="0,12,0,0">
-                                    <RadioButton Classes="segment" GroupName="FpsChoice" Tag="60" Content="60 (default)"/>
-                                    <RadioButton Classes="segment" GroupName="FpsChoice" Tag="120" Content="120"/>
-                                    <RadioButton Classes="segment" GroupName="FpsChoice" Tag="144" Content="144"/>
-                                    <RadioButton Classes="segment" GroupName="FpsChoice" Tag="240" Content="240"/>
-                                    <RadioButton Classes="segment" GroupName="FpsChoice" Tag="9999" Content="Unlimited"/>
-                                </WrapPanel>
-                                <TextBlock Classes="hint" Margin="0,10,0,0"
-                                           Text="Your screen still shows its own refresh rate. A higher target mainly makes the game feel more responsive."/>
-                            </StackPanel>
-                        </Border>
-
-                        <Border Classes="card">
                             <StackPanel>
                                 <TextBlock Text="Less to draw" Classes="label"/>
                                 <TextBlock Classes="hint" TextWrapping="Wrap" HorizontalAlignment="Left" MaxWidth="620"
-                                           Text="Fewer things on screen means the frames that are drawn come faster. Both of these are a trade, and both are undone by Restore."/>
+                                           Text="Fewer things on screen means the frames that do get drawn come faster. This is the part that genuinely helps on a Mac. Both are a trade, and both are undone by Restore."/>
 
                                 <StackPanel Orientation="Horizontal" Margin="0,14,0,0" Spacing="10">
                                     <Button Name="FpsBoostButton" Content="Lower graphics" Height="38" Padding="16,0"/>
@@ -1028,7 +1014,30 @@
                                 </StackPanel>
 
                                 <TextBlock Classes="hint" Margin="0,10,0,0" TextWrapping="Wrap" HorizontalAlignment="Left" MaxWidth="620"
-                                           Text="Lower graphics drops texture detail, grass, anti-aliasing and moving light. Grey sky replaces the skybox with flat grey - ugly, and genuinely faster."/>
+                                           Text="Lower graphics drops texture detail, grass, anti-aliasing, moving light, and the detail on unioned parts. Grey sky replaces the skybox with flat grey - ugly, and genuinely faster."/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card">
+                            <StackPanel>
+                                <TextBlock Text="Why there is no frame-rate setting" Classes="label"/>
+                                <TextBlock Classes="hint" TextWrapping="Wrap" HorizontalAlignment="Left" MaxWidth="620"
+                                           Text="Version 1.2.8 had one, and it did not work. In September 2025 Roblox limited local settings to an approved list, and the frame-rate target is not on it - the client reads the file, ignores that entry and says nothing about it. There was nothing to notice, which is why it shipped."/>
+                                <TextBlock Classes="hint" Margin="0,8,0,0" TextWrapping="Wrap" HorizontalAlignment="Left" MaxWidth="620"
+                                           Text="On a Mac the client also follows your display's refresh rate, so on a 60Hz screen 60 frames is the ceiling whatever any setting claims. Offering the choice again would be pretending otherwise. If Roblox ever approves the setting, it comes back."/>
+
+                                <!-- Only shown to the people who have the inert entry sitting
+                                     in their file from 1.2.8. -->
+                                <StackPanel Name="DeadFlagNotice" IsVisible="False" Margin="0,14,0,0">
+                                    <TextBlock Text="You have the old entry"
+                                               FontWeight="SemiBold" FontSize="13"
+                                               Foreground="{DynamicResource Accent}"/>
+                                    <TextBlock Classes="hint" TextWrapping="Wrap" HorizontalAlignment="Left" MaxWidth="620"
+                                               Text="A frame-rate target set by an older version of Jinxy is still in Roblox's settings file. It is doing nothing. This takes it out."/>
+                                    <Button Name="ClearDeadFlagsButton" Content="Remove it"
+                                            Height="34" Padding="14,0" Margin="0,10,0,0"
+                                            HorizontalAlignment="Left"/>
+                                </StackPanel>
                             </StackPanel>
                         </Border>
 
