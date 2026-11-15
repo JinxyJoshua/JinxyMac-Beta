@@ -999,6 +999,42 @@
                          Mac client reads them. See MainWindow.Tweaks.cs. -->
                     <StackPanel Name="PagePerformance" IsVisible="False">
 
+                        <!-- Shown when macOS refuses the write, which is the usual
+                             reason this page does nothing on a Mac. Hidden
+                             otherwise. See MainWindow.Tweaks.cs. -->
+                        <Border Name="FlagAccessNotice" Classes="card" IsVisible="False"
+                                BorderBrush="{DynamicResource Accent}" BorderThickness="1">
+                            <StackPanel>
+                                <TextBlock Text="macOS is blocking this" Classes="label"
+                                           Foreground="{DynamicResource Accent}"/>
+                                <TextBlock Name="FlagAccessText" Classes="hint"
+                                           TextWrapping="Wrap" HorizontalAlignment="Left" MaxWidth="620"/>
+                                <TextBlock Name="FlagAccessFixText" Classes="hint" Margin="0,8,0,0"
+                                           TextWrapping="Wrap" HorizontalAlignment="Left" MaxWidth="620"/>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0" Spacing="10">
+                                    <Button Name="FlagAccessSettingsButton" Classes="accent"
+                                            Content="Open Privacy settings" Height="38" Padding="16,0"/>
+                                    <Button Name="FlagAccessRecheckButton" Content="Check again"
+                                            Height="38" MinWidth="112" Padding="16,0"/>
+                                </StackPanel>
+
+                                <TextBlock Text="Or run this in Terminal" Classes="tiny" Margin="0,16,0,6"/>
+
+                                <Border Background="{DynamicResource Sunken}" CornerRadius="6" Padding="12,10">
+                                    <DockPanel LastChildFill="False">
+                                        <Button Name="FlagAccessCopyButton" DockPanel.Dock="Right"
+                                                Content="Copy" Height="28" MinWidth="72" Padding="10,0"
+                                                VerticalAlignment="Center" Margin="12,0,0,0"/>
+                                        <TextBlock Name="FlagAccessCommand" VerticalAlignment="Center"
+                                                   FontFamily="Menlo, Monaco, monospace" FontSize="11"
+                                                   TextWrapping="Wrap" MaxWidth="500"
+                                                   Foreground="{DynamicResource TextDim}"/>
+                                    </DockPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+
                         <!-- "Less to draw" is the hero because it is the half of
                              this page that works. The frame-rate target that used
                              to sit above it did not - see the card below. -->

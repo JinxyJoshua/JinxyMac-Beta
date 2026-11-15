@@ -202,6 +202,69 @@ public sealed class RobloxFastFlags
     /// <summary>Whether a Roblox install was found to write to at all.</summary>
     public bool RobloxFound => FindClientSettingsFolder() != null;
 
+    /// <summary>
+    /// Why the last write failed, if one did.
+    /// </summary>
+    /// <remarks>
+    /// Kept because the alternative — a bare false — is what made this
+    /// undiagnosable. "Could not write" was shown for a blocked permission, a
+    /// running Roblox and a missing install alike, so the one piece of
+    /// information worth having was the one thrown away.
+    /// </remarks>
+    public FlagAccessReport? LastFailure { get; private set; }
+
+    /// <summary>
+    /// Finds out whether the settings can actually be written, by writing.
+    /// </summary>
+    /// <remarks>
+    /// A real attempt rather than an inspection of permissions. macOS decides
+    /// this with App Management, bundle ownership and whatever the installer
+    /// left behind, and reading those back is guesswork — trying it is not.
+    /// This is the lesson from the frame-rate setting: ask the system, do not
+    /// assume the answer.
+    ///
+    /// <para>The probe file is deleted. The folder, if this created it, is left:
+    /// it is where the settings belong, and Roblox ignores an empty one.</para>
+    /// </remarks>
+    public FlagAccessReport Probe()
+    {
+        string? folder = FindClientSettingsFolder();
+
+        if (folder == null)
+        {
+            LastFailure = new FlagAccessReport(FlagAccess.NoRoblox);
+            return LastFailure;
+        }
+
+        string probe = Path.Combine(folder, ".jinxy-write-test");
+
+        try
+        {
+            Directory.CreateDirectory(folder);
+            File.WriteAllText(probe, "");
+            File.Delete(probe);
+
+            LastFailure = null;
+            return new FlagAccessReport(FlagAccess.Ready, folder);
+        }
+        catch (Exception error)
+        {
+            LastFailure = FlagAccessReport.From(error, folder);
+            return LastFailure;
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(probe)) File.Delete(probe);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Could not write it, so there is nothing to clean up.
+            }
+        }
+    }
+
     private string? SettingsPath()
     {
         string? folder = FindClientSettingsFolder();
@@ -242,7 +305,12 @@ public sealed class RobloxFastFlags
     public bool Apply(IReadOnlyList<FastFlag> flags)
     {
         string? folder = FindClientSettingsFolder();
-        if (folder == null) return false;
+
+        if (folder == null)
+        {
+            LastFailure = new FlagAccessReport(FlagAccess.NoRoblox);
+            return false;
+        }
 
         try
         {
@@ -253,11 +321,16 @@ public sealed class RobloxFastFlags
             foreach (FastFlag flag in flags) settings[flag.Name] = flag.Value;
 
             Write(settings);
+
+            LastFailure = null;
             return true;
         }
-        catch
+        catch (Exception error)
         {
-            // Roblox running, or a bundle this user cannot write to.
+            // Recorded rather than swallowed: macOS blocking the bundle, a
+            // running Roblox holding the file, and a missing install all land
+            // here and all need different advice.
+            LastFailure = FlagAccessReport.From(error, folder);
             return false;
         }
     }
@@ -265,7 +338,13 @@ public sealed class RobloxFastFlags
     /// <summary>Removes the named flags, leaving anything else in the file alone.</summary>
     public bool Clear(IEnumerable<string> flagNames)
     {
-        if (FindClientSettingsFolder() == null) return false;
+        string? folder = FindClientSettingsFolder();
+
+        if (folder == null)
+        {
+            LastFailure = new FlagAccessReport(FlagAccess.NoRoblox);
+            return false;
+        }
 
         try
         {
@@ -273,10 +352,13 @@ public sealed class RobloxFastFlags
             foreach (string name in flagNames) settings.Remove(name);
 
             Write(settings);
+
+            LastFailure = null;
             return true;
         }
-        catch
+        catch (Exception error)
         {
+            LastFailure = FlagAccessReport.From(error, folder);
             return false;
         }
     }
@@ -359,7 +441,12 @@ public sealed class RobloxFastFlags
     public bool Restore(IEnumerable<string>? alsoClear = null)
     {
         string? path = SettingsPath();
-        if (path == null) return false;
+
+        if (path == null)
+        {
+            LastFailure = new FlagAccessReport(FlagAccess.NoRoblox);
+            return false;
+        }
 
         try
         {
@@ -369,6 +456,8 @@ public sealed class RobloxFastFlags
             {
                 File.Copy(backup, path, overwrite: true);
                 File.Delete(backup);
+
+                LastFailure = null;
                 return true;
             }
 
@@ -383,8 +472,9 @@ public sealed class RobloxFastFlags
 
             return Clear(ours);
         }
-        catch
+        catch (Exception error)
         {
+            LastFailure = FlagAccessReport.From(error, Path.GetDirectoryName(path));
             return false;
         }
     }

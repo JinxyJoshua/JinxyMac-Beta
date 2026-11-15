@@ -36,7 +36,12 @@ public partial class MainWindow
         DiagnosticsText.Text = MacDiagnostics.Report(
             Updater.Version,
             Describe(MacPermissions.Accessibility()),
-            Describe(MacPermissions.ScreenRecording()));
+            Describe(MacPermissions.ScreenRecording()),
+
+            // By attempting a write, so the report says what actually happens
+            // rather than what ought to. This is the line that answers "the
+            // flags are not working for me" without another round of asking.
+            _flags.Probe().Line);
     }
 
     private static string Describe(Permission permission) => permission switch

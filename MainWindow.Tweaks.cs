@@ -52,6 +52,25 @@ public partial class MainWindow
 
         ClearDeadFlagsButton.Click += (_, _) =>
             ReportTweaks(_flags.ClearDeadFlags(), "The old frame-rate entry has been taken out.");
+
+        FlagAccessSettingsButton.Click += (_, _) =>
+            Open("x-apple.systempreferences:com.apple.preference.security?Privacy_AppManagement");
+
+        FlagAccessCopyButton.Click += async (_, _) =>
+        {
+            if (Clipboard == null) return;
+
+            await Clipboard.SetTextAsync(FlagAccessCommand.Text ?? "");
+            FlagAccessCopyButton.Content = "Copied";
+        };
+
+        FlagAccessRecheckButton.Click += (_, _) =>
+        {
+            RefreshTweaks();
+
+            if (_flags.Probe().CanWrite)
+                TweaksStatus.Text = "That worked — Jinxy can change Roblox's settings now.";
+        };
     }
 
     private void ToggleGraySky()
@@ -75,9 +94,18 @@ public partial class MainWindow
     /// <summary>Puts the page in step with what is actually in Roblox's file.</summary>
     private void RefreshTweaks()
     {
-        if (!_flags.RobloxFound)
+        // Asked before anything is offered, by actually attempting a write.
+        // macOS blocks changes to another app's bundle unless it has been given
+        // App Management, and Roblox's settings live inside Roblox — so on a
+        // Mac without that permission every button on this page fails. Finding
+        // that out on arrival beats finding it out by pressing one.
+        FlagAccessReport access = _flags.Probe();
+
+        ShowFlagAccess(access);
+
+        if (!access.CanWrite)
         {
-            TweaksStatus.Text = "No Roblox install found. Install Roblox, then come back.";
+            TweaksStatus.Text = access.Explain;
             SetTweaksEnabled(false);
             DeadFlagNotice.IsVisible = false;
             return;
@@ -111,11 +139,45 @@ public partial class MainWindow
         ClearDeadFlagsButton.IsEnabled = on;
     }
 
+    /// <summary>
+    /// Shows the permission notice, or hides it.
+    /// </summary>
+    /// <remarks>
+    /// The Terminal command is offered because macOS does not always put an app
+    /// in the App Management list at all — an app signed the way this one is may
+    /// never appear there, and then the switch the notice asks for does not
+    /// exist. The command creates the folder as root and hands it to the user,
+    /// after which Jinxy writes it with no permission at all.
+    ///
+    /// <para>It is never run by the app. It needs an administrator password, and
+    /// that is the user's to type rather than something to ask for on their
+    /// behalf.</para>
+    /// </remarks>
+    private void ShowFlagAccess(FlagAccessReport access)
+    {
+        bool blocked = access.State == FlagAccess.Blocked;
+
+        FlagAccessNotice.IsVisible = blocked;
+
+        if (!blocked) return;
+
+        FlagAccessText.Text = access.Explain;
+        FlagAccessFixText.Text = access.Fix ?? "";
+        FlagAccessCommand.Text = access.TerminalFix ?? "";
+    }
+
     private void ReportTweaks(bool worked, string done)
     {
         if (!worked)
         {
-            TweaksStatus.Text = "Could not write Roblox's settings. Close Roblox and try again.";
+            // The real reason, rather than one guess for every cause. The old
+            // line said "close Roblox and try again" even when macOS was
+            // refusing the write, which closing Roblox does nothing about.
+            FlagAccessReport why =
+                _flags.LastFailure ?? new FlagAccessReport(FlagAccess.Unknown);
+
+            ShowFlagAccess(why);
+            TweaksStatus.Text = why.Explain;
             return;
         }
 

@@ -28,7 +28,15 @@ public static class MacDiagnostics
     /// The report, as plain lines. Facts macOS alone can answer are passed in by
     /// the window layer, which owns the permission checks.
     /// </summary>
-    public static string Report(string appVersion, string accessibility, string screenRecording)
+    /// <param name="robloxSettings">
+    /// Whether Roblox's settings file can be written, which on a Mac is a
+    /// separate permission from the other two and the usual reason the
+    /// Performance page does nothing. Passed in because the answer comes from
+    /// attempting a write, which belongs to the writer rather than here.
+    /// </param>
+    public static string Report(
+        string appVersion, string accessibility, string screenRecording,
+        string robloxSettings = "not checked")
     {
         string exe = ExecutablePath();
         string? bundle = AppBundlePath(AppContext.BaseDirectory);
@@ -40,6 +48,7 @@ public static class MacDiagnostics
             $"Runtime: {RuntimeInformation.FrameworkDescription}, {RuntimeInformation.ProcessArchitecture}",
             $"Accessibility: {accessibility}",
             $"Screen recording: {screenRecording}",
+            $"Roblox settings: {robloxSettings}",
             $"App bundle: {bundle ?? "not running from a .app"}",
             $"Running from Applications: {(bundle?.Contains("/Applications/", StringComparison.Ordinal) == true ? "yes" : "no")}",
             $"Signed as: {SigningIdentifier(exe) ?? "no signature found"}",
